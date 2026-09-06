@@ -1,1 +1,1 @@
-#this is the player file
+#this is the human player file
