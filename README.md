@@ -280,9 +280,9 @@ The game may later be implemented with a graphical or web-based interface.
 
 ## Group Members
 
-Saif Salem Aldhaheri 100063183
-Sultan Mohammed Aljaberi 100063074
-Saeed Khalifa Alkaabi 100063100
+Saif Salem Aldhaheri 100063183,
+Sultan Mohammed Aljaberi 100063074,
+Saeed Khalifa Alkaabi 100063100,
 Suhail Saeed Al Hammadi 100063443
 ---
 
