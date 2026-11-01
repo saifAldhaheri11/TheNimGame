@@ -2,296 +2,203 @@
 
 ## Project Overview
 
-This project is a digital implementation of the **Nim Game**, where a human player competes against an AI opponent.
+This project is an interactive Python implementation of the **Nim Game**, developed for the **Introduction to Artificial Intelligence (COSC 330)** course at Khalifa University.
 
-The game starts with a single pile containing **15 objects**. The player and AI take turns removing objects from the pile. On each turn, a player may remove **1, 2, or 3 objects**.
+The game allows a human player to compete against an AI opponent using different decision-making and search algorithms.
 
-The goal is to be the player who removes the **last object from the pile**.
+The game begins with a single pile containing **15 objects**. Players take turns removing 1, 2, or 3 objects from the pile.
 
-The game includes three AI difficulty levels, each using a different algorithm.
+This project follows the **Misère Nim** variation, where the player who removes the last object **loses**.
+
+The game features four AI difficulty levels:
+
+1. **Easy:** Random Algorithm
+2. **Medium:** Greedy Algorithm
+3. **Hard:** Depth-Limited Minimax
+4. **Extreme:** Minimax with Alpha-Beta Pruning
+
+The player can select the AI difficulty and choose whether to play first or allow the AI to make the opening move.
+
+The project's objective is to implement and compare AI algorithms based on their decision-making strategies, effectiveness, and computational performance.
 
 ---
 
 ## Game Rules
 
-1. The game starts with **15 objects** in one pile.
-2. The human player and AI take turns.
-3. On each turn, the current player may remove:
-
-   * 1 object
-   * 2 objects
-   * 3 objects
+1. The game begins with **15 objects** in a single pile.
+2. The game is played between a human player and an AI opponent.
+3. Each player can remove **1, 2, or 3 objects** during their turn.
 4. A player cannot remove more objects than are currently available.
-5. The player who removes the **last object wins the game**.
-6. The game ends when the number of remaining objects reaches `0`.
-
-### Example
-
-The game may progress as follows:
-
-```text
-Starting objects: 15
-
-Player removes 2
-Remaining objects: 13
-
-AI removes 1
-Remaining objects: 12
-
-Player removes 3
-Remaining objects: 9
-
-AI removes 1
-Remaining objects: 8
-
-...
-```
-
-The game continues until one player removes the final object.
+5. The player who removes the **last object loses the game**.
+6. The game ends when no objects remain.
+7. Before starting, the human player selects one of the four AI difficulty levels.
+8. The human player can choose whether to make the first move or let the AI start.
+9. If the AI starts first, its opening move is randomly selected from the available valid moves, regardless of difficulty.
+10. After its opening move, the AI follows the algorithm associated with the selected difficulty level.
 
 ---
 
-## AI Difficulty Levels
+## AI Difficulty Levels and Algorithms
 
-The game contains three AI difficulty levels:
+The game features four difficulty levels, each demonstrating a different approach to AI decision-making.
 
-### Easy: Random Algorithm
+### 1. Easy: Random Algorithm
 
-The Easy AI selects a valid move randomly.
+The Easy AI uses **Random Selection** to choose its moves.
 
-It chooses between removing:
+The algorithm identifies the available valid moves and randomly selects one without evaluating future game states.
 
-```text
-1, 2, or 3 objects
-```
+The AI does not consider the consequences of its decisions or attempt to find an optimal strategy.
 
-as long as the selected number does not exceed the number of objects remaining.
+**Algorithm Characteristics:**
+- Randomly selects a valid move.
+- Does not explore future game states.
+- Does not use a heuristic evaluation function.
+- Requires minimal computational resources.
 
-The Easy AI does not analyze future moves or use a strategy to guarantee a win.
+### 2. Medium: Greedy Algorithm
 
-#### Algorithm
+The Medium AI uses a **Greedy Algorithm**, which focuses on making decisions based on the current game state.
 
-```text
-Find all valid moves
-        ↓
-Randomly select one
-        ↓
-Remove the selected number of objects
-```
+The planned implementation selects the move that removes the maximum number of objects currently allowed, without searching through future moves.
 
----
+Unlike adversarial search algorithms, this approach does not consider how the human player might respond.
 
-### Medium: Minimax Algorithm
+**Algorithm Characteristics:**
+- Chooses the locally preferred move.
+- Does not explore a game tree.
+- Does not account for future opponent responses.
+- Has low computational complexity.
 
-The Medium AI uses the **Minimax algorithm**.
+Because a locally preferred move is not necessarily the best long-term decision, the Greedy Algorithm does not guarantee victory.
 
-Minimax analyzes possible future moves by constructing a game tree. The AI considers its possible actions and the possible responses of the human player.
+### 3. Hard: Depth-Limited Minimax Algorithm
 
-Game states are evaluated based on whether they eventually result in an AI win or a player win.
+The Hard AI uses the **Minimax Algorithm** with a fixed search depth of **3**.
 
-For example:
+Minimax is an adversarial search algorithm designed for two-player games. It evaluates possible moves while assuming that both players attempt to make decisions that benefit themselves.
 
-```text
-AI Win      = +1
-Player Win  = -1
-```
+The algorithm constructs a game tree representing possible future states and alternates between maximizing the AI's outcome and minimizing it through the opponent's responses.
 
-A simplified game tree may look like:
+Unlike full-depth Minimax, this implementation limits the search to three levels to reduce computational cost.
 
-```text
-              Current State
-             /      |      \
-         Take 1   Take 2   Take 3
-           /         |         \
-      Future      Future      Future
-       States      States      States
-```
+When the search reaches its depth limit before reaching a terminal state, a heuristic evaluation function estimates the desirability of the resulting position.
 
-The AI examines the possible outcomes and chooses the move that gives it the best result.
+**Algorithm Characteristics:**
+- Uses adversarial search.
+- Explores possible future moves.
+- Uses a fixed search depth of 3.
+- Considers possible opponent responses.
+- Requires a heuristic function for evaluating nonterminal states.
 
-To keep the Medium difficulty less predictable than the Hard difficulty, the implementation may limit the Minimax search or occasionally allow the AI to select a non-optimal move.
+The heuristic evaluation function will be finalized during implementation.
 
----
+### 4. Extreme: Minimax with Alpha-Beta Pruning
 
-### Hard: Optimal Mathematical Algorithm
+The Extreme AI uses **Minimax with Alpha-Beta Pruning**.
 
-The Hard AI uses the mathematical strategy for this version of Nim.
+Alpha-Beta Pruning is an optimization of the Minimax Algorithm that reduces the number of game states explored without changing the optimal result of a completed search.
 
-Since a player can remove between **1 and 3 objects**, the important number is:
+The algorithm maintains two values:
 
-```text
-3 + 1 = 4
-```
+- **Alpha (α):** The best score the maximizing player can guarantee so far.
+- **Beta (β):** The best score the minimizing player can guarantee so far.
 
-The AI attempts to leave the human player with a number of objects that is a **multiple of 4**.
+When the algorithm determines that further exploration of a branch cannot affect the final decision, it stops searching that branch.
 
-The important positions are:
+Unlike the Hard difficulty, the Extreme AI is designed to search the game tree until terminal states are reached.
 
-```text
-4
-8
-12
-```
-
-The AI calculates:
-
-```text
-move = remaining_objects % 4
-```
-
-For example:
-
-```text
-15 objects remaining
-
-15 % 4 = 3
-
-AI removes 3
-
-12 objects remain
-```
-
-Another example:
-
-```text
-10 objects remaining
-
-10 % 4 = 2
-
-AI removes 2
-
-8 objects remain
-```
-
-If the AI continuously leaves the opponent with a multiple of 4, it can force a win when starting from a winning position.
-
-If:
-
-```text
-remaining_objects % 4 == 0
-```
-
-there is no move that guarantees victory against a perfect opponent. In this situation, the AI can choose one of the available valid moves.
+**Algorithm Characteristics:**
+- Uses adversarial search.
+- Searches to terminal game states.
+- Eliminates unnecessary branches through pruning.
+- Produces the same optimal minimax result as an equivalent full-depth search.
+- Can reduce the number of explored states compared with Minimax without pruning.
 
 ---
 
 ## Algorithm Comparison
 
-| Difficulty | Algorithm                      | Strategy                             |
-| ---------- | ------------------------------ | ------------------------------------ |
-| Easy       | Random Selection               | Selects a random valid move          |
-| Medium     | Minimax                        | Searches possible future game states |
-| Hard       | Mathematical / Modulo Strategy | Attempts to leave multiples of 4     |
+| Difficulty | Algorithm | Search Strategy |
+|---|---|---|
+| Easy | Random Selection | Selects a random valid move |
+| Medium | Greedy | Chooses the maximum legal removal |
+| Hard | Depth-Limited Minimax | Explores future states up to depth 3 |
+| Extreme | Minimax with Alpha-Beta Pruning | Searches to terminal states with branch pruning |
+
+The algorithms differ in their decision-making methods, search depth, computational requirements, and ability to anticipate future moves.
 
 ---
 
 ## Project Structure
 
-The project can be organized as follows:
+The project is organized into the following files:
 
 ```text
-nim_game/
-│
+TheNimGame/
 ├── main.py
 ├── game.py
 ├── player.py
 ├── ai.py
-└── README.md
+├── README.md
+└── .gitignore
 ```
 
 ### `main.py`
 
-Controls the overall execution of the game, including:
+Serves as the entry point of the application.
 
-* Starting the game
-* Managing player and AI turns
-* Checking when the game ends
-* Displaying the winner
+It is responsible for starting the program and connecting the different components of the game.
 
 ### `game.py`
 
-Contains the main game logic, including:
+Contains the main game logic and user interface, including:
 
-* Number of remaining objects
-* Validating moves
-* Removing objects
-* Checking whether the game has ended
+- Displaying the main menu.
+- Allowing the player to select the difficulty level.
+- Displaying the game rules.
+- Managing the game state and player turns.
+- Checking valid moves and game-ending conditions.
+- Determining the winner according to Misère Nim rules.
 
 ### `player.py`
 
-Handles the human player's input and move selection.
+Handles the human player's interactions, including:
+
+- Receiving the player's move.
+- Validating player input.
+- Ensuring that the number of removed objects is valid.
 
 ### `ai.py`
 
-Contains the AI algorithms used by the three difficulty levels:
+Contains the AI decision-making logic for all four difficulty levels:
 
-* Random algorithm
-* Minimax algorithm
-* Optimal mathematical algorithm
+- Random Algorithm for Easy difficulty.
+- Greedy Algorithm for Medium difficulty.
+- Depth-Limited Minimax for Hard difficulty.
+- Minimax with Alpha-Beta Pruning for Extreme difficulty.
 
----
+It also handles selecting an AI move based on the chosen difficulty level.
 
-## Game Flow
+### `README.md`
 
-```text
-Start Game
-    ↓
-Select AI Difficulty
-    ↓
-Initialize 15 Objects
-    ↓
-Player Turn
-    ↓
-Validate Move
-    ↓
-Remove Objects
-    ↓
-Are There 0 Objects?
-    ↓
-Yes → Player Wins
-    ↓ No
-AI Turn
-    ↓
-AI Selects Move
-    ↓
-Remove Objects
-    ↓
-Are There 0 Objects?
-    ↓
-Yes → AI Wins
-    ↓ No
-Return to Player Turn
-```
-
----
-
-## Technologies
-
-The initial version of the project is developed using:
-
-* Python
-* Object-Oriented Programming
-* Minimax search
-* Mathematical game strategy
-
-The game may later be implemented with a graphical or web-based interface.
+Provides the project overview, game rules, explanations of the AI algorithms, project structure, and group information.
 
 ---
 
 ## Group Members
 
-- Saif Salem Aldhaheri — 100063183
-- Sultan Mohammed Aljaberi — 100063074
-- Saeed Khalifa Alkaabi — 100063100
-- Suhail Saeed Al Hammadi — 100063443
----
+| Name | Student ID |
+|---|---|
+| Saif Salem Aldhaheri | 100063183 |
+| Sultan Mohammed Aljaberi | 100063074 |
+| Saeed Khalifa Alkaabi | 100063100 |
+| Suhail Saeed Al Hammadi | 100063443 |
 
 ## Instructor
 
-**Instructor Name:** Naoufel Werghi
+**Naoufel Werghi**
 
----
+## Course
 
-## Authors
-
-Developed as a group project for **Intro to Atrificial Intelligence COSC 330**.
+**Introduction to Artificial Intelligence (COSC 330)**
