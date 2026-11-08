@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project is an interactive Python implementation of the **Nim Game**, developed for the **Introduction to Artificial Intelligence (COSC 330)** course at Khalifa University.
+This project is an interactive Python implementation of the **Nim Game**
 
 The game allows a human player to compete against an AI opponent using different decision-making and search algorithms.
 
@@ -184,21 +184,3 @@ It also handles selecting an AI move based on the chosen difficulty level.
 
 Provides the project overview, game rules, explanations of the AI algorithms, project structure, and group information.
 
----
-
-## Group Members
-
-| Name | Student ID |
-|---|---|
-| Saif Salem Aldhaheri | 100063183 |
-| Sultan Mohammed Aljaberi | 100063074 |
-| Saeed Khalifa Alkaabi | 100063100 |
-| Suhail Saeed Al Hammadi | 100063443 |
-
-## Instructor
-
-**Naoufel Werghi**
-
-## Course
-
-**Introduction to Artificial Intelligence (COSC 330)**
