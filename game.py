@@ -130,7 +130,7 @@ def select_first_player():
 
         elif choice == '2':
             print("The AI will play first.")
-            return "Player"
+            return "AI"
 
         else:
             print("Invalid choice. Please choose 1 or 2.")
@@ -193,6 +193,9 @@ def play_game(remaining_objects, first_player, difficulty):
             elif difficulty == '2':
                 # Medium: Greedy
                 move = ai.greedy_ai(remaining_objects)
+
+            elif difficulty == '3':
+                move = ai.minima_ai(remaining_objects, depth=3)
 
             else:
                 # Hard and Extreme are not implemented yet
