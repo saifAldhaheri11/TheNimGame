@@ -6,17 +6,17 @@ from session import DIFFICULTIES, GameSession
 
 
 # Interface colors
-BACKGROUND = "#071f1b"
-PANEL = "#10392e"
-BOARD = "#12533c"
-GOLD = "#edc466"
-CREAM = "#fff0cd"
-MUTED = "#aac1af"
-BORDER = "#365d4c"
+BACKGROUND = "#071510"  # Very dark green background
+PANEL = "#183D2D"       # Button background
+BOARD = "#1D6044"       # Matchstick board
+GOLD = "#FFD54A"        # Bright yellow buttons and highlights
+CREAM = "#FFFFFF"       # White text
+MUTED = "#D5E8DD"       # Light text for smaller labels
+BORDER = "#89BFA0"      # Visible borders
 
 # Interface fonts
-TITLE_FONT = "Palatino"
-BUTTON_FONT = "Helvetica"
+TITLE_FONT = "Times"
+BUTTON_FONT = "Arial"
 
 
 class NimApp(tk.Tk):
@@ -98,7 +98,7 @@ class NimApp(tk.Tk):
             fg=BACKGROUND if primary else CREAM,
             activebackground="#f7d78e" if primary else BORDER,
             activeforeground=BACKGROUND if primary else CREAM,
-            disabledforeground="#718779",
+            disabledforeground="#B8C9BF",
             relief="flat",
             bd=0,
             highlightthickness=2,
