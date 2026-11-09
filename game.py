@@ -1,15 +1,26 @@
-# This is the game file
+# This file contains the game rules and terminal version
 from player import get_player_move
 import ai
 
+
+# Starting object limits
 INITIAL_OBJECTS = 15
+MIN_OBJECTS = 5
+MAX_OBJECTS = 30
+
 
 # Initialize the game
 def initialize_game(starting_objects=INITIAL_OBJECTS):
+    if (
+        type(starting_objects) is not int
+        or not MIN_OBJECTS <= starting_objects <= MAX_OBJECTS
+    ):
+        raise ValueError("Choose between 5 and 30 matches")
+
     return starting_objects
 
 
-# Main menu
+# Main menu for the terminal version
 def start_game():
     starting_objects = INITIAL_OBJECTS
 
@@ -22,7 +33,7 @@ def start_game():
 
         choice = input("Enter your choice: ")
 
-        if choice == '1':
+        if choice == "1":
             print("\nSelect Difficulty Level:")
             print("1. Easy")
             print("2. Medium")
@@ -30,86 +41,96 @@ def start_game():
             print("4. Extreme")
 
             levels = {
-                '1': 'Easy',
-                '2': 'Medium',
-                '3': 'Hard',
-                '4': 'Extreme'
+                "1": "Easy",
+                "2": "Medium",
+                "3": "Hard",
+                "4": "Extreme"
             }
 
             while True:
                 difficulty = input("Enter your choice: ")
 
                 if difficulty in levels:
-                    print(f"You have chosen {levels[difficulty]} level.")
+                    print(
+                        f"You have chosen "
+                        f"{levels[difficulty]} level."
+                    )
                     break
-                else:
-                    print("Invalid difficulty. Please choose 1, 2, 3, or 4.")
+
+                print("Invalid difficulty. Choose 1, 2, 3, or 4.")
 
             remaining_objects = initialize_game(starting_objects)
-            print(f"Starting game with {remaining_objects} objects.")
 
-            # Starting player selection and game loop
+            print(
+                f"Starting game with {remaining_objects} objects."
+            )
+
             first_player = select_first_player()
-            print(f"First player: {first_player}")
-            play_game(remaining_objects, first_player, difficulty)
-            # will be implemented later.
 
-        elif choice == '2':
+            play_game(
+                remaining_objects,
+                first_player,
+                difficulty
+            )
+
+        elif choice == "2":
             print("\nGame Rules:")
-            print("1. The game starts with 15 objects by default.")
-            print("2. The number of objects can be changed in Settings.")
-            print("3. Players take turns removing 1, 2, or 3 objects.")
-            print("4. A player cannot remove more objects than remain.")
-            print("5. The player who removes the last object loses.")
+            print("1. The starting number is 15.")
+            print("2. Choose 5 to 30 objects in Settings.")
+            print("3. Players remove 1, 2, or 3 objects per turn.")
+            print("4. You cannot remove more objects than remain.")
+            print("5. Whoever removes the last object loses.")
 
-        elif choice == '3':
+        elif choice == "3":
             starting_objects = settings(starting_objects)
 
-        elif choice == '4':
+        elif choice == "4":
             print("Exiting the game. Goodbye!")
             break
 
         else:
-            print("Invalid choice. Please choose 1, 2, 3, or 4.")
+            print("Invalid choice. Choose 1, 2, 3, or 4.")
 
 
-# Settings menu
+# Settings for the terminal version
 def settings(starting_objects):
     while True:
         print("\nSettings")
         print(f"Current number of objects: {starting_objects}")
         print("1. Change number of objects")
-        print("2. Reset to default (15)")
+        print("2. Reset to 15")
         print("3. Back to Main Menu")
 
         choice = input("Enter your choice: ")
 
-        if choice == '1':
+        if choice == "1":
             while True:
-                user_input = input("Enter the new number of objects: ")
+                user_input = input(
+                    "Enter the number of objects (5-30): "
+                )
 
                 try:
                     new_objects = int(user_input)
+                    starting_objects = initialize_game(new_objects)
 
-                    if new_objects > 0:
-                        starting_objects = new_objects
-                        print(f"Number of objects changed to {starting_objects}.")
-                        break
-                    else:
-                        print("Please enter a positive number.")
+                    print(
+                        f"Number of objects changed to "
+                        f"{starting_objects}."
+                    )
+                    break
 
                 except ValueError:
-                    print("Invalid input. Please enter a whole number.")
+                    print("Enter a whole number from 5 to 30.")
 
-        elif choice == '2':
+        elif choice == "2":
             starting_objects = INITIAL_OBJECTS
             print("Number of objects reset to 15.")
 
-        elif choice == '3':
+        elif choice == "3":
             return starting_objects
 
         else:
-            print("Invalid choice. Please choose 1, 2, or 3.")
+            print("Invalid choice. Choose 1, 2, or 3.")
 
 
 # Select who plays first
@@ -121,16 +142,15 @@ def select_first_player():
 
         choice = input("Enter your choice: ")
 
-        if choice == '1':
-            print("You will play first.")
+        if choice == "1":
             return "Player"
 
-        elif choice == '2':
-            print("The AI will play first.")
+        elif choice == "2":
             return "AI"
 
         else:
-            print("Invalid choice. Please choose 1 or 2.")
+            print("Invalid choice. Choose 1 or 2.")
+
 
 # Get valid moves
 def get_valid_moves(remaining_objects):
@@ -160,13 +180,15 @@ def is_game_over(remaining_objects):
 def get_winner(last_player):
     if last_player == "Player":
         return "AI"
+
     elif last_player == "AI":
         return "Player"
+
     else:
         raise ValueError("Invalid player")
 
 
-# Main game loop
+# Main game loop for the terminal version
 def play_game(remaining_objects, first_player, difficulty):
     current_player = first_player
     first_move = True
@@ -179,31 +201,39 @@ def play_game(remaining_objects, first_player, difficulty):
             print(f"Player removed {move} object(s).")
 
         else:
+            # The AI opening move is random
             if first_move:
-                # AI's first move is random if AI starts
                 move = ai.random_ai(remaining_objects)
 
-            elif difficulty == '1':
-                # Easy: Random
+            elif difficulty == "1":
                 move = ai.random_ai(remaining_objects)
 
-            elif difficulty == '2':
-                # Medium: Greedy
+            elif difficulty == "2":
                 move = ai.greedy_ai(remaining_objects)
 
-            elif difficulty == '3':
-                move = ai.minimax_ai(remaining_objects, depth=3)
+            elif difficulty == "3":
+                move = ai.minimax_ai(
+                    remaining_objects,
+                    depth=3
+                )
 
-            elif difficulty =='4':
-                move=ai.alpha_beta_ai(remaining_objects,depth=4)
+            elif difficulty == "4":
+                move = ai.alpha_beta_ai(
+                    remaining_objects,
+                    depth=4
+                )
+
             else:
-                # Hard and Extreme are not implemented yet
-                print("This difficulty is not available yet.")
+                print("Invalid difficulty.")
                 return
 
             print(f"AI removed {move} object(s).")
 
-        remaining_objects = remove_objects(remaining_objects, move)
+        remaining_objects = remove_objects(
+            remaining_objects,
+            move
+        )
+
         first_move = False
 
         if is_game_over(remaining_objects):
@@ -220,6 +250,7 @@ def play_game(remaining_objects, first_player, difficulty):
         else:
             current_player = "Player"
 
-# Run the program
+
+# Run the terminal version
 if __name__ == "__main__":
     start_game()

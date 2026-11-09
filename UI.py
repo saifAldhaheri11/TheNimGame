@@ -12,17 +12,12 @@ BACKGROUND = "#081C14"
 PANEL = "#19432F"
 BOARD = "#246348"
 GOLD = "#FFD54A"
-CREAM = "#FFFFFF"
-MUTED = "#DCEDE3"
+WHITE = "#FFFFFF"
+LIGHT = "#DCEDE3"
 BORDER = "#79AD90"
 
-# Interface fonts
-TITLE_FONT = "Times"
-BUTTON_FONT = "Helvetica"
-
-
-# A button that displays our colors on macOS
-class GlowButton(tk.Label):
+# A colored button made from a label
+class ColorButton:
 
     def __init__(
         self,
@@ -30,176 +25,165 @@ class GlowButton(tk.Label):
         text,
         command,
         primary=False,
-        **kwargs
+        value=None,
+        width=0
     ):
         self.command = command
-        self.inside = False
+        self.value = value
+        self.primary = primary
+        self.selected = False
+        self.enabled = True
+        self.hovered = False
         self.focused = False
 
-        self.normal_background = GOLD if primary else PANEL
-        self.normal_foreground = BACKGROUND if primary else CREAM
-
-        super().__init__(
+        self.widget = tk.Label(
             parent,
             text=text,
-            bg=self.normal_background,
-            fg=self.normal_foreground,
-            font=(BUTTON_FONT, 13, "bold"),
+            font=("Helvetica", 13, "bold"),
             padx=18,
             pady=10,
-            relief="flat",
-            borderwidth=0,
-            highlightthickness=3,
-            highlightbackground=BORDER,
-            highlightcolor=GOLD,
-            disabledforeground="#CCDCD2",
+            width=width,
             cursor="hand2",
-            takefocus=True,
-            **kwargs
+            highlightthickness=3,
+            takefocus=True
         )
 
-        # Mouse controls
-        self.bind(
-            "<Enter>",
-            lambda event: self.set_hover(True)
-        )
-        self.bind(
-            "<Leave>",
-            lambda event: self.set_hover(False)
-        )
-        self.bind("<Button-1>", self.mouse_press)
-        self.bind("<ButtonRelease-1>", self.mouse_release)
-
-        # Keyboard controls
-        self.bind(
-            "<FocusIn>",
-            lambda event: self.set_focus(True)
-        )
-        self.bind(
-            "<FocusOut>",
-            lambda event: self.set_focus(False)
-        )
-        self.bind("<space>", self.keyboard_press)
-
-    # Keep the colors when the button changes
-    def configure(self, cnf=None, **kwargs):
-        if isinstance(cnf, dict):
-            kwargs = {**cnf, **kwargs}
-
-        elif cnf is not None:
-            return super().configure(cnf, **kwargs)
-
-        if not kwargs:
-            return super().configure()
-
-        if "bg" in kwargs:
-            self.normal_background = kwargs["bg"]
-
-        if "fg" in kwargs:
-            self.normal_foreground = kwargs["fg"]
-
-        result = super().configure(**kwargs)
+        self.widget.bind("<Button-1>", self.click)
+        self.widget.bind("<space>", self.key_press)
+        self.widget.bind("<Enter>", self.mouse_enter)
+        self.widget.bind("<Leave>", self.mouse_leave)
+        self.widget.bind("<FocusIn>", self.focus_in)
+        self.widget.bind("<FocusOut>", self.focus_out)
 
         self.paint()
-        return result
 
-    config = configure
-
-    # Show normal, highlighted, or disabled colors
+    # Update the button colors
     def paint(self):
-        disabled = self.cget("state") == "disabled"
-
-        background = self.normal_background
-        foreground = self.normal_foreground
+        background = PANEL
+        text = WHITE
         border = BORDER
 
-        if disabled:
-            background = "#263F32"
-            foreground = "#CCDCD2"
-            border = "#557762"
+        if self.primary or self.selected:
+            background = GOLD
+            text = BACKGROUND
 
-        elif self.inside or self.focused:
-            if background == GOLD:
+        if self.hovered or self.focused:
+            border = GOLD
+
+            if self.primary or self.selected:
                 background = "#FFE789"
             else:
                 background = "#2D6848"
 
-            border = GOLD
+        if not self.enabled:
+            background = "#263F32"
+            text = "#CCDCD2"
+            border = "#557762"
 
-        super().configure(
+        self.widget.configure(
             bg=background,
-            fg=foreground,
+            fg=text,
             highlightbackground=border,
             highlightcolor=border,
-            cursor="" if disabled else "hand2"
+            takefocus=self.enabled
         )
 
-    def set_hover(self, value):
-        self.inside = value
+        if self.enabled:
+            self.widget.configure(cursor="hand2")
+        else:
+            self.widget.configure(cursor="")
+
+    def set_enabled(self, enabled):
+        self.enabled = enabled
         self.paint()
 
-    def set_focus(self, value):
-        self.focused = value
+    def set_selected(self, selected):
+        self.selected = selected
         self.paint()
 
-    def mouse_press(self, event):
-        if self.cget("state") != "disabled":
-            self.focus_set()
+    def set_text(self, text):
+        self.widget.configure(text=text)
 
-    def mouse_release(self, event):
-        if (
-            0 <= event.x < self.winfo_width()
-            and 0 <= event.y < self.winfo_height()
-        ):
-            self.invoke()
+    # Run the action, with an optional value
+    def activate(self):
+        if self.enabled:
+            if self.value is None:
+                self.command()
+            else:
+                self.command(self.value)
 
-    def keyboard_press(self, event):
-        self.invoke()
+    def click(self, event):
+        if self.enabled:
+            self.widget.focus_set()
+            self.activate()
+
         return "break"
 
-    # Run the button action
-    def invoke(self):
-        if self.cget("state") != "disabled":
-            return self.command()
+    def key_press(self, event):
+        self.activate()
+        return "break"
+
+    def mouse_enter(self, event):
+        self.hovered = True
+        self.paint()
+
+    def mouse_leave(self, event):
+        self.hovered = False
+        self.paint()
+
+    def focus_in(self, event):
+        self.focused = True
+        self.paint()
+
+    def focus_out(self, event):
+        self.focused = False
+        self.paint()
 
 
-class NimApp(tk.Tk):
+# An ordinary class that contains the window
+class NimApp:
 
-    # Initialize the application
     def __init__(self):
-        super().__init__()
-
-        self.title("Nim - Matchstick Game")
-        self.geometry("1040x850")
-        self.minsize(800, 720)
-        self.configure(bg=BACKGROUND)
+        self.window = tk.Tk()
+        self.window.title("The NIM Game - Intro to AI Project")
+        self.window.geometry("1040x850")
+        self.window.minsize(800, 720)
+        self.window.configure(bg=BACKGROUND)
 
         self.difficulty = "Medium"
         self.first_player = "Player"
         self.starting_objects = game.INITIAL_OBJECTS
 
-        self.session = None
         self.screen = "setup"
+        self.session = None
 
         self.selected = set()
         self.ai_highlight = set()
-
         self.focus_match = None
         self.hovered_match = None
+
         self.pending = None
+        self.popup = None
+        self.buttons = []
 
-        self.animations = tk.BooleanVar(value=True)
-        self.sound = tk.BooleanVar(value=False)
-
-        self.protocol("WM_DELETE_WINDOW", self.close)
-
-        self.bind("<Return>", self.enter_key)
-        self.bind(
-            "<Escape>",
-            lambda event: self.clear_selection()
+        self.animations = tk.BooleanVar(
+            master=self.window,
+            value=True
+        )
+        self.sound = tk.BooleanVar(
+            master=self.window,
+            value=False
         )
 
+        self.window.protocol("WM_DELETE_WINDOW", self.close)
+        self.window.bind("<Return>", self.enter_key)
+        self.window.bind("<Escape>", self.clear_selection)
+
         self.show_setup()
+
+    # Keep the existing main.py working
+    def mainloop(self):
+        self.window.mainloop()
 
     # Create a label
     def label(
@@ -207,65 +191,62 @@ class NimApp(tk.Tk):
         parent,
         text,
         size=14,
-        color=CREAM,
-        bold=False,
-        **kwargs
+        color=WHITE,
+        bold=False
     ):
+        weight = "normal"
+
+        if bold:
+            weight = "bold"
+
         return tk.Label(
             parent,
             text=text,
             bg=parent.cget("bg"),
             fg=color,
-            font=(
-                TITLE_FONT,
-                size,
-                "bold" if bold else "normal"
-            ),
-            **kwargs
+            font=("Times", size, weight)
         )
 
-    # Create a button
+    # Create and remember a button
     def button(
         self,
         parent,
         text,
         command,
         primary=False,
-        **kwargs
+        value=None,
+        width=0
     ):
-        return GlowButton(
+        button = ColorButton(
             parent,
             text,
             command,
-            primary=primary,
-            **kwargs
+            primary,
+            value,
+            width
         )
 
-    # Cancel a pending AI action
+        self.buttons.append(button)
+        return button
+
+    # Stop an unfinished AI action
     def cancel_pending(self):
         if self.pending is not None:
-            self.after_cancel(self.pending)
+            self.window.after_cancel(self.pending)
             self.pending = None
 
-    # Schedule an action without freezing the window
-    def later(self, delay, callback):
-        self.cancel_pending()
-
-        def run():
-            self.pending = None
-            callback()
-
-        self.pending = self.after(delay, run)
-
-    # Create the top bar
+    # Build the shared top bar
     def shell(self):
         self.cancel_pending()
 
-        for child in self.winfo_children():
-            child.destroy()
+        for widget in self.window.winfo_children():
+            widget.destroy()
+
+        self.popup = None
+        self.buttons = []
 
         header = tk.Frame(
-            self,
+            self.window,
             bg=BACKGROUND,
             padx=28,
             pady=14
@@ -274,8 +255,8 @@ class NimApp(tk.Tk):
 
         self.label(
             header,
-            "NIM",
-            size=34,
+            "The NIM Game",
+            34,
             bold=True
         ).pack(side="left")
 
@@ -283,21 +264,24 @@ class NimApp(tk.Tk):
             header,
             "Settings",
             self.show_settings
-        ).pack(side="right", padx=(12, 0))
+        ).widget.pack(side="right", padx=(12, 0))
 
         self.button(
             header,
             "How to Play",
             self.show_rules
-        ).pack(side="right")
+        ).widget.pack(side="right")
 
         tk.Frame(
-            self,
+            self.window,
             bg=BORDER,
             height=1
         ).pack(fill="x")
 
-        self.body = tk.Frame(self, bg=BACKGROUND)
+        self.body = tk.Frame(
+            self.window,
+            bg=BACKGROUND
+        )
         self.body.pack(
             fill="both",
             expand=True,
@@ -313,7 +297,6 @@ class NimApp(tk.Tk):
         content = tk.Frame(self.body, bg=BACKGROUND)
         content.pack(expand=True)
 
-        # Draw decorative matches
         art = tk.Canvas(
             content,
             width=200,
@@ -329,11 +312,11 @@ class NimApp(tk.Tk):
         self.label(
             content,
             "Choose your difficulty",
-            size=25,
+            25,
             bold=True
         ).pack(pady=(0, 14))
 
-        # Difficulty buttons
+        # Difficulty choices
         grid = tk.Frame(content, bg=BACKGROUND)
         grid.pack()
 
@@ -343,11 +326,12 @@ class NimApp(tk.Tk):
             button = self.button(
                 grid,
                 level,
-                lambda value=level: self.set_difficulty(value),
+                self.choose_difficulty,
+                value=level,
                 width=16
             )
 
-            button.grid(
+            button.widget.grid(
                 row=index // 2,
                 column=index % 2,
                 padx=8,
@@ -360,40 +344,35 @@ class NimApp(tk.Tk):
         self.label(
             content,
             "Who starts?",
-            size=21,
+            21,
             bold=True
         ).pack(pady=(14, 8))
 
-        # Starting player buttons
+        # Starting player choices
         choices = tk.Frame(content, bg=BACKGROUND)
         choices.pack()
 
         self.first_buttons = {}
 
-        for value, text in (("Player", "You"), ("AI", "AI")):
+        for player, text in (("Player", "You"), ("AI", "AI")):
             button = self.button(
                 choices,
                 text,
-                lambda choice=value: self.set_first(choice),
+                self.choose_first,
+                value=player,
                 width=10
             )
 
-            button.pack(side="left", padx=6)
-            self.first_buttons[value] = button
+            button.widget.pack(side="left", padx=6)
+            self.first_buttons[player] = button
 
         self.opening_note = self.label(
-            content,
-            "",
-            size=12,
-            color=MUTED
+            content, "", 12, LIGHT
         )
         self.opening_note.pack(pady=8)
 
         self.count_note = self.label(
-            content,
-            "",
-            size=15,
-            color=GOLD
+            content, "", 15, GOLD
         )
         self.count_note.pack(pady=(0, 10))
 
@@ -405,51 +384,37 @@ class NimApp(tk.Tk):
             self.start_game,
             primary=True,
             width=29
-        ).pack(pady=8)
+        ).widget.pack(pady=8)
 
-        self.set_difficulty(self.difficulty)
-        self.set_first(self.first_player)
+        self.choose_difficulty(self.difficulty)
+        self.choose_first(self.first_player)
 
-    # Show the starting match count
+    def choose_difficulty(self, level):
+        self.difficulty = level
+
+        for name, button in self.difficulty_buttons.items():
+            button.set_selected(name == level)
+
+    def choose_first(self, player):
+        self.first_player = player
+
+        for name, button in self.first_buttons.items():
+            button.set_selected(name == player)
+
+        text = ""
+
+        if player == "AI":
+            text = "The AI's opening move is random."
+
+        self.opening_note.configure(text=text)
+
     def update_count_note(self):
         if self.screen == "setup":
             self.count_note.configure(
                 text=f"Starting matches: {self.starting_objects}"
             )
 
-    # Highlight the selected difficulty
-    def set_difficulty(self, value):
-        self.difficulty = value
-
-        for level, button in self.difficulty_buttons.items():
-            selected = level == value
-
-            button.configure(
-                bg=GOLD if selected else PANEL,
-                fg=BACKGROUND if selected else CREAM
-            )
-
-    # Highlight the selected starting player
-    def set_first(self, value):
-        self.first_player = value
-
-        for player, button in self.first_buttons.items():
-            selected = player == value
-
-            button.configure(
-                bg=GOLD if selected else PANEL,
-                fg=BACKGROUND if selected else CREAM
-            )
-
-        self.opening_note.configure(
-            text=(
-                "The AI's opening move is random."
-                if value == "AI"
-                else ""
-            )
-        )
-
-    # Start a new game
+    # Create the game screen
     def start_game(self):
         self.session = GameSession(
             self.difficulty,
@@ -459,79 +424,59 @@ class NimApp(tk.Tk):
 
         self.selected.clear()
         self.ai_highlight.clear()
-
         self.focus_match = None
         self.hovered_match = None
 
         self.screen = "game"
         self.shell()
 
-        # Show the selected settings
-        badges = tk.Frame(self.body, bg=BACKGROUND)
-        badges.pack(fill="x")
+        starter = "You started"
+
+        if self.first_player == "AI":
+            starter = "AI started"
 
         self.label(
-            badges,
-            self.difficulty,
-            size=13,
-            color=GOLD
-        ).pack(side="left")
+            self.body,
+            f"({self.difficulty})  |  {starter}",
+            13,
+            GOLD
+        ).pack(anchor="w")
 
-        starting_text = (
-            "  |  You started"
-            if self.first_player == "Player"
-            else "  |  AI started"
-        )
-
-        self.label(
-            badges,
-            starting_text,
-            size=13,
-            color=MUTED
-        ).pack(side="left")
-
-        # Show whose turn it is
+        # Turn indicators
         turn = tk.Frame(self.body, bg=BACKGROUND)
         turn.pack(pady=(6, 4))
 
         self.you_badge = self.label(
-            turn,
-            "  You  ",
-            size=16,
-            bold=True,
-            padx=18,
-            pady=7
+            turn, "  You  ", 16, bold=True
         )
-        self.you_badge.pack(side="left", padx=3)
+        self.you_badge.pack(
+            side="left",
+            padx=3,
+            ipadx=18,
+            ipady=7
+        )
 
         self.ai_badge = self.label(
-            turn,
-            "  AI  ",
-            size=16,
-            bold=True,
-            padx=18,
-            pady=7
+            turn, "  AI  ", 16, bold=True
         )
-        self.ai_badge.pack(side="left", padx=3)
+        self.ai_badge.pack(
+            side="left",
+            padx=3,
+            ipadx=18,
+            ipady=7
+        )
 
         self.turn_label = self.label(
-            self.body,
-            "",
-            size=13,
-            color=GOLD,
-            bold=True
+            self.body, "", 13, GOLD, True
         )
         self.turn_label.pack(pady=4)
 
         self.count_label = self.label(
-            self.body,
-            "",
-            size=29,
-            bold=True
+            self.body, "", 29, bold=True
         )
         self.count_label.pack(pady=(0, 12))
 
-        # Create the matchstick board
+        # Matchstick board
         self.board = tk.Canvas(
             self.body,
             bg=BOARD,
@@ -541,41 +486,27 @@ class NimApp(tk.Tk):
             highlightbackground=BORDER,
             highlightcolor=GOLD
         )
-
         self.board.pack(
             fill="both",
             expand=True,
             padx=35
         )
 
-        # Mouse controls
-        self.board.bind(
-            "<Configure>",
-            lambda event: self.draw_board()
-        )
+        self.board.bind("<Configure>", self.draw_board)
         self.board.bind("<Button-1>", self.click_board)
         self.board.bind("<Motion>", self.hover_board)
         self.board.bind("<Leave>", self.leave_board)
+        self.board.bind("<FocusIn>", self.board_focus)
+        self.board.bind("<FocusOut>", self.draw_board)
+        self.board.bind("<space>", self.select_focused)
 
-        # Keyboard controls
         for key in ("Left", "Right", "Up", "Down"):
             self.board.bind(
                 "<" + key + ">",
                 self.navigate_board
             )
 
-        self.board.bind("<space>", self.select_focused)
-        self.board.bind("<FocusIn>", self.board_focus)
-        self.board.bind(
-            "<FocusOut>",
-            lambda event: self.draw_board()
-        )
-
-        self.selection_label = self.label(
-            self.body,
-            "",
-            size=14
-        )
+        self.selection_label = self.label(self.body, "")
         self.selection_label.pack(pady=(12, 7))
 
         # Move controls
@@ -589,89 +520,90 @@ class NimApp(tk.Tk):
             primary=True,
             width=24
         )
-        self.remove_button.pack(side="left", padx=8)
+        self.remove_button.widget.pack(
+            side="left",
+            padx=8
+        )
 
         self.clear_button = self.button(
             actions,
             "Clear selection",
             self.clear_selection
         )
-        self.clear_button.pack(side="left", padx=8)
+        self.clear_button.widget.pack(
+            side="left",
+            padx=8
+        )
 
         self.feedback = self.label(
-            self.body,
-            "",
-            size=12,
-            color=MUTED
+            self.body, "", 12, LIGHT
         )
         self.feedback.pack(pady=9)
 
-        # Navigation controls
         bottom = tk.Frame(self.body, bg=BACKGROUND)
         bottom.pack(fill="x", pady=(3, 0))
 
         self.button(
             bottom,
-            "Back to setup",
+            "Leave Game",
             self.back_to_setup
-        ).pack(side="left")
+        ).widget.pack(side="left")
 
         self.button(
             bottom,
-            "Restart",
+            "Restart Game",
             self.restart
-        ).pack(side="right")
+        ).widget.pack(side="right")
 
         self.refresh()
 
         if self.session.current_player == "AI":
-            self.later(650, self.ai_turn)
+            self.pending = self.window.after(
+                650,
+                self.ai_turn
+            )
 
-    # Draw one matchstick
-    @staticmethod
+    # Draw a match and its glow
     def draw_match(
+        self,
         canvas,
         x,
         y,
         height,
         selected=False,
-        focused=False,
-        hovered=False
+        hovered=False,
+        focused=False
     ):
         width = max(7, height * 0.12)
 
-        # Draw the shadow
+        # Shadow
         canvas.create_line(
-            x + 4,
-            y + 14,
-            x + 4,
-            y + height + 3,
+            x + 4, y + 14,
+            x + 4, y + height + 3,
             fill="#103B29",
             width=width + 5,
             capstyle="round"
         )
 
-        # Light up hovered and selected matches
+        # Hover or selection glow
         if selected or hovered:
+            colors = (
+                "#3C8961",
+                "#72C393",
+                "#BEFFCE"
+            )
+
             if selected:
                 colors = (
                     "#99782B",
                     "#E8B938",
                     "#FFE873"
                 )
-            else:
-                colors = (
-                    "#3C8961",
-                    "#72C393",
-                    "#BEFFCE"
-                )
 
             for color, spread in zip(colors, (12, 7, 3)):
                 canvas.create_line(
-                    x,
-                    y + 5,
-                    x,
-                    y + height - 3,
+                    x, y + 5,
+                    x, y + height - 3,
                     fill=color,
                     width=width + spread * 2,
                     capstyle="round"
@@ -686,59 +618,53 @@ class NimApp(tk.Tk):
                     outline=""
                 )
 
-        # Draw the wooden stem
+        # Wooden stem
+        wood = "#F3C776"
+
+        if selected:
+            wood = "#FFE09A"
+
         canvas.create_rectangle(
-            x - width / 2,
-            y + 10,
-            x + width / 2,
-            y + height,
-            fill="#FFE09A" if selected else "#F3C776",
+            x - width / 2, y + 10,
+            x + width / 2, y + height,
+            fill=wood,
             outline="#BA8D43"
         )
 
         canvas.create_line(
-            x - width / 4,
-            y + 14,
-            x - width / 4,
-            y + height - 3,
+            x - width / 4, y + 14,
+            x - width / 4, y + height - 3,
             fill="#FFF2C4",
             width=max(2, width / 3)
         )
 
-        # Draw the red head
+        # Red head
         canvas.create_oval(
-            x - width * 0.8,
-            y - 3,
-            x + width * 0.8,
-            y + width * 1.8,
-            fill="#FF5360" if selected else "#EE3547",
+            x - width * 0.8, y - 3,
+            x + width * 0.8, y + width * 1.8,
+            fill="#EE3547",
             outline="#AD2032",
             width=2
         )
 
         canvas.create_oval(
-            x - width * 0.4,
-            y,
-            x + width * 0.15,
-            y + width * 0.6,
+            x - width * 0.4, y,
+            x + width * 0.15, y + width * 0.6,
             fill="#FF9299",
             outline=""
         )
 
-        # Show keyboard focus
         if focused:
             canvas.create_rectangle(
-                x - width - 17,
-                y - 19,
-                x + width + 17,
-                y + height + 15,
-                outline=CREAM,
+                x - width - 17, y - 19,
+                x + width + 17, y + height + 15,
+                outline=WHITE,
                 dash=(4, 4),
                 width=2
             )
 
-    # Arrange up to 30 matches on one board
-    def draw_board(self):
+    # Keep the matches in their original positions
+    def draw_board(self, event=None):
         if self.screen != "game":
             return
 
@@ -747,22 +673,22 @@ class NimApp(tk.Tk):
         width = self.board.winfo_width()
         height = self.board.winfo_height()
 
-        if self.session.starting_objects <= 15:
-            self.columns = 5
-        else:
+        self.columns = 5
+
+        if self.session.starting_objects > 15:
             self.columns = 6
 
         rows = math.ceil(
             self.session.starting_objects / self.columns
         )
-
         row_height = height / rows
         match_height = min(100, row_height * 0.58)
 
         self.hitboxes = {}
 
         for match in self.session.matches:
-            row, column = divmod(match, self.columns)
+            row = match // self.columns
+            column = match % self.columns
 
             x = width * (column + 1) / (self.columns + 1)
             y = (
@@ -778,14 +704,14 @@ class NimApp(tk.Tk):
             if selected:
                 y -= 4
 
-            focused = (
-                self.focus_get() == self.board
-                and match == self.focus_match
-            )
-
             hovered = (
                 self.human_turn()
                 and match == self.hovered_match
+            )
+
+            focused = (
+                self.window.focus_get() == self.board
+                and match == self.focus_match
             )
 
             self.draw_match(
@@ -794,19 +720,22 @@ class NimApp(tk.Tk):
                 y,
                 match_height,
                 selected,
-                focused,
-                hovered
+                hovered,
+                focused
             )
 
-            # Make matches easier to click
             self.hitboxes[match] = (
-                x - 25,
-                y - 12,
-                x + 25,
-                y + match_height + 12
+                x - 25, y - 12,
+                x + 25, y + match_height + 12
             )
 
-    # Find the match under the mouse
+    def human_turn(self):
+        return (
+            self.screen == "game"
+            and not self.session.winner
+            and self.session.current_player == "Player"
+        )
+
     def hit_match(self, x, y):
         for match, bounds in self.hitboxes.items():
             left, top, right, bottom = bounds
@@ -816,15 +745,6 @@ class NimApp(tk.Tk):
 
         return None
 
-    # Check whether the player can move
-    def human_turn(self):
-        return (
-            self.screen == "game"
-            and not self.session.winner
-            and self.session.current_player == "Player"
-        )
-
-    # Handle a clicked match
     def click_board(self, event):
         if self.human_turn():
             match = self.hit_match(event.x, event.y)
@@ -834,46 +754,46 @@ class NimApp(tk.Tk):
                 self.board.focus_set()
                 self.toggle_match(match)
 
-    # Light up the match under the mouse
     def hover_board(self, event):
+        match = None
+
         if self.human_turn():
             match = self.hit_match(event.x, event.y)
-        else:
-            match = None
-
-        self.board.configure(
-            cursor="hand2" if match is not None else ""
-        )
 
         if match != self.hovered_match:
             self.hovered_match = match
             self.draw_board()
 
-    # Clear the hover highlight
+        cursor = ""
+
+        if match is not None:
+            cursor = "hand2"
+
+        self.board.configure(cursor=cursor)
+
     def leave_board(self, event):
         self.hovered_match = None
         self.board.configure(cursor="")
         self.draw_board()
 
-    # Set the first keyboard selection
+    # Keyboard controls for the board
     def board_focus(self, event):
-        if self.focus_match not in self.session.matches:
-            self.focus_match = next(
-                iter(self.session.matches),
-                None
-            )
+        if (
+            self.focus_match not in self.session.matches
+            and self.session.matches
+        ):
+            self.focus_match = self.session.matches[0]
 
         self.draw_board()
 
-    # Move between matches with the arrow keys
     def navigate_board(self, event):
         matches = self.session.matches
 
         if matches:
+            index = 0
+
             if self.focus_match in matches:
                 index = matches.index(self.focus_match)
-            else:
-                index = 0
 
             steps = {
                 "Left": -1,
@@ -882,16 +802,13 @@ class NimApp(tk.Tk):
                 "Down": self.columns
             }
 
-            index = (
-                index + steps[event.keysym]
-            ) % len(matches)
-
-            self.focus_match = matches[index]
+            self.focus_match = matches[
+                (index + steps[event.keysym]) % len(matches)
+            ]
             self.draw_board()
 
         return "break"
 
-    # Select the focused match with Space
     def select_focused(self, event):
         if (
             self.human_turn()
@@ -901,7 +818,7 @@ class NimApp(tk.Tk):
 
         return "break"
 
-    # Select or deselect a match
+    # Select up to three matches
     def toggle_match(self, match):
         if (
             not self.human_turn()
@@ -925,74 +842,72 @@ class NimApp(tk.Tk):
         self.feedback.configure(text="")
 
         if self.sound.get():
-            self.bell()
+            self.window.bell()
 
         self.refresh()
 
-    # Clear the selected matches
-    def clear_selection(self):
+    def clear_selection(self, event=None):
         if self.human_turn():
             self.selected.clear()
             self.feedback.configure(text="")
             self.refresh()
 
-    # Update the game screen
+    # Format the match count
+    def match_text(self, count):
+        if count == 1:
+            return "1 match"
+
+        return f"{count} matches"
+
+    # Show the latest count and turn
     def refresh(self):
         player = self.human_turn()
 
-        self.you_badge.configure(
-            bg=GOLD if player else PANEL,
-            fg=BACKGROUND if player else MUTED
-        )
+        self.you_badge.configure(bg=PANEL, fg=LIGHT)
+        self.ai_badge.configure(bg=PANEL, fg=LIGHT)
 
-        self.ai_badge.configure(
-            bg=PANEL if player else GOLD,
-            fg=MUTED if player else BACKGROUND
-        )
-
-        self.turn_label.configure(
-            text="YOUR TURN" if player else "AI'S TURN"
-        )
-
-        count = self.session.remaining
-        word = "match" if count == 1 else "matches"
-
-        self.count_label.configure(
-            text=f"{count} {word} remaining"
-        )
+        turn = "AI'S TURN"
+        selection = "AI is choosing..."
 
         if player:
-            selection_text = f"{len(self.selected)} of 3 selected"
+            self.you_badge.configure(
+                bg=GOLD,
+                fg=BACKGROUND
+            )
+            turn = "YOUR TURN"
+            selection = f"{len(self.selected)} of 3 selected"
+
         else:
-            selection_text = "AI is choosing..."
+            self.ai_badge.configure(
+                bg=GOLD,
+                fg=BACKGROUND
+            )
 
-        self.selection_label.configure(
-            text=selection_text
+        self.turn_label.configure(text=turn)
+
+        self.count_label.configure(
+            text=self.match_text(self.session.remaining)
+            + " remaining"
         )
 
-        count = len(self.selected)
+        self.selection_label.configure(text=selection)
 
-        if count:
-            word = "match" if count == 1 else "matches"
-            text = f"Remove {count} {word}"
-        else:
-            text = "Remove matches"
+        text = "Remove matches"
 
-        state = (
-            "normal"
-            if player and count
-            else "disabled"
-        )
+        if self.selected:
+            text = "Remove " + self.match_text(
+                len(self.selected)
+            )
 
-        self.remove_button.configure(
-            text=text,
-            state=state
-        )
-        self.clear_button.configure(state=state)
+        self.remove_button.set_text(text)
 
+        enabled = player and len(self.selected) > 0
+
+        self.remove_button.set_enabled(enabled)
+        self.clear_button.set_enabled(enabled)
         self.draw_board()
 
-    # Confirm the player move
+    # Complete the player move
     def remove_selected(self):
         if not self.human_turn() or not self.selected:
             return
@@ -1007,59 +922,77 @@ class NimApp(tk.Tk):
         self.selected.clear()
         self.hovered_match = None
 
-        word = "match" if count == 1 else "matches"
-
         self.feedback.configure(
-            text=f"You removed {count} {word}."
+            text="You removed " + self.match_text(count) + "."
         )
 
         self.refresh()
 
         if self.session.winner:
             self.show_result()
-        else:
-            delay = 650 if self.animations.get() else 50
-            self.later(delay, self.ai_turn)
 
-    # Highlight and remove the AI matches
+        else:
+            delay = 50
+
+            if self.animations.get():
+                delay = 650
+
+            self.pending = self.window.after(
+                delay,
+                self.ai_turn
+            )
+
+    # Ask the existing AI for its move
     def ai_turn(self):
+        self.pending = None
+
         if self.screen != "game" or self.session.winner:
             return
 
         count = self.session.choose_ai_move()
 
-        # Match positions do not affect the AI decision
-        chosen = self.session.matches[-count:]
+        self.ai_choices = self.session.matches[-count:]
+        self.ai_highlight = set(self.ai_choices)
 
-        self.ai_highlight = set(chosen)
         self.draw_board()
 
-        def finish():
-            self.session.remove(chosen, "AI")
-            self.ai_highlight.clear()
+        delay = 1
 
-            word = "match" if count == 1 else "matches"
+        if self.animations.get():
+            delay = 550
 
-            self.feedback.configure(
-                text=f"AI removed {count} {word}."
-            )
+        self.pending = self.window.after(
+            delay,
+            self.finish_ai_move
+        )
 
-            self.refresh()
+    # Remove the highlighted AI matches
+    def finish_ai_move(self):
+        self.pending = None
+        count = len(self.ai_choices)
 
-            if self.session.winner:
-                self.show_result()
+        self.session.remove(self.ai_choices, "AI")
+        self.ai_highlight.clear()
 
-        delay = 550 if self.animations.get() else 1
-        self.later(delay, finish)
+        self.feedback.configure(
+            text="AI removed " + self.match_text(count) + "."
+        )
 
-    # Show the winner
+        self.refresh()
+
+        if self.session.winner:
+            self.show_result()
+
+    # Show the winner and replay buttons
     def show_result(self):
         self.cancel_pending()
         self.screen = "result"
 
         self.turn_label.configure(text="GAME OVER")
         self.selection_label.configure(text="")
-        self.remove_button.configure(state="disabled")
+
+        self.remove_button.set_enabled(False)
+        self.clear_button.set_enabled(False)
 
         card = tk.Frame(
             self.body,
@@ -1069,32 +1002,21 @@ class NimApp(tk.Tk):
             padx=40,
             pady=22
         )
+        card.place(relx=0.5, rely=0.5, anchor="center")
 
-        card.place(
-            relx=0.5,
-            rely=0.5,
-            anchor="center"
-        )
+        title = "AI WINS"
+        reason = "You took the last match."
 
-        won = self.session.winner == "Player"
+        if self.session.winner == "Player":
+            title = "YOU WIN!"
+            reason = "The AI took the last match."
 
         self.label(
-            card,
-            "YOU WIN!" if won else "AI WINS",
-            size=32,
-            bold=True
+            card, title, 32, bold=True
         ).pack(pady=10)
 
-        explanation = (
-            "The AI took the last match."
-            if won
-            else "You took the last match."
-        )
-
         self.label(
-            card,
-            explanation,
-            size=15
+            card, reason, 15
         ).pack(pady=(0, 18))
 
         self.button(
@@ -1103,14 +1025,14 @@ class NimApp(tk.Tk):
             self.start_game,
             primary=True,
             width=22
-        ).pack(pady=5)
+        ).widget.pack(pady=5)
 
         self.button(
             card,
             "Change Settings",
             self.show_setup,
             width=22
-        ).pack(pady=5)
+        ).widget.pack(pady=5)
 
     # Confirm before leaving an unfinished game
     def confirm_leave(self, title, question):
@@ -1120,51 +1042,40 @@ class NimApp(tk.Tk):
         return messagebox.askyesno(
             title,
             question,
-            parent=self
+            parent=self.window
         )
 
-    # Restart with the same settings
     def restart(self):
-        confirmed = self.confirm_leave(
-            "Restart game",
+        if self.confirm_leave(
+            "Restart Game",
             "Restart this game? "
-            "Your current progress will be lost."
-        )
-
-        if confirmed:
+        ):
             self.start_game()
 
-    # Return to setup
     def back_to_setup(self):
-        confirmed = self.confirm_leave(
-            "Back to setup",
+        if self.confirm_leave(
+            "Leave Game",
             "Leave this game? "
-            "Your current progress will be lost."
-        )
-
-        if confirmed:
+        ):
             self.show_setup()
 
-    # Close the application
     def close(self):
-        confirmed = self.confirm_leave(
-            "Close Nim",
+        if self.confirm_leave(
+            "Close Game",
             "Close this game? "
-            "Your current progress will be lost."
-        )
-
-        if confirmed:
+        ):
             self.cancel_pending()
-            self.destroy()
+            self.window.destroy()
 
-    # Handle the Enter key
     def enter_key(self, event):
-        focused = self.focus_get()
+        focused = self.window.focus_get()
 
-        if isinstance(focused, GlowButton):
-            focused.invoke()
+        for button in self.buttons:
+            if focused == button.widget:
+                button.activate()
+                return "break"
 
-        elif self.screen == "setup":
+        if self.screen == "setup":
             self.start_game()
 
         elif self.human_turn():
@@ -1173,17 +1084,28 @@ class NimApp(tk.Tk):
         return "break"
 
     # Create a popup window
-    def dialog(self, title):
-        window = tk.Toplevel(self)
+    def make_popup(self, title):
+        self.close_popup()
 
-        window.title(title)
-        window.configure(bg=BACKGROUND)
-        window.resizable(False, False)
-        window.transient(self)
-        window.grab_set()
+        self.popup = tk.Toplevel(self.window)
+        self.popup.title(title)
+        self.popup.configure(bg=BACKGROUND)
+        self.popup.resizable(False, False)
+        self.popup.transient(self.window)
+        self.popup.grab_set()
+
+        self.popup.protocol(
+            "WM_DELETE_WINDOW",
+            self.close_popup
+        )
+        self.popup.bind("<Escape>", self.close_popup)
+
+        x = self.window.winfo_rootx() + 100
+        y = self.window.winfo_rooty() + 100
+        self.popup.geometry(f"+{x}+{y}")
 
         frame = tk.Frame(
-            window,
+            self.popup,
             bg=BACKGROUND,
             padx=30,
             pady=24
@@ -1191,171 +1113,128 @@ class NimApp(tk.Tk):
         frame.pack(fill="both", expand=True)
 
         self.label(
-            frame,
-            title,
-            size=26,
-            bold=True
+            frame, title, 26, bold=True
         ).pack(pady=(0, 18))
 
-        window.bind(
-            "<Escape>",
-            lambda event: window.destroy()
-        )
+        return frame
 
-        x = self.winfo_rootx() + 100
-        y = self.winfo_rooty() + 100
+    def close_popup(self, event=None):
+        if self.popup is not None:
+            self.buttons = [
+                button
+                for button in self.buttons
+                if button.widget.winfo_toplevel() != self.popup
+            ]
 
-        window.geometry(f"+{x}+{y}")
+            self.popup.destroy()
+            self.popup = None
 
-        return window, frame
+        return "break"
 
     # Show the rules
     def show_rules(self):
-        window, frame = self.dialog("How to Play")
+        frame = self.make_popup("How to Play")
 
         text = (
-            "Choose 1-30 starting matches in Settings.\n"
-            "The default is 15. All matches belong to one pile.\n\n"
-            "Take turns removing 1, 2, or 3 matches.\n"
-            "Whoever takes the last match loses.\n\n"
-            "Click any matches to select them.\n"
-            "Click again to deselect, then press Remove.\n"
-            "You can select across all rows.\n\n"
-            "If AI starts, its opening move is random.\n\n"
-            "Keyboard: Tab to the board, arrows to move,\n"
-            "Space to select, Enter to remove, Esc to clear."
+            "- Choose 5-30 starting matches in Settings.\n"
+            "- Take turns removing 1, 2, or 3 matches.\n"
+            "- Whoever takes the last match loses.\n"
+            "- Click matches to select or deselect them.\n"
+            "- You can select across all rows.\n"
+            "- Press Remove to confirm your move.\n"
+            "- If AI starts, its opening move is random.\n"
+            "- All matchsticks belong to one pile.\n"
+            "- Keyboard: (Tab) to the board, (arrows) to move,\n"
+            "(space) to select, (Enter) to remove, (Esc) to clear."
         )
 
-        self.label(
-            frame,
-            text,
-            size=15,
-            justify="left"
-        ).pack(pady=(0, 20))
+        rules = self.label(frame, text, 15)
+        rules.configure(justify="left")
+        rules.pack(pady=(0, 20))
 
         self.button(
             frame,
             "Got it",
-            window.destroy,
+            self.close_popup,
             primary=True
-        ).pack()
+        ).widget.pack()
 
-        window.bind(
-            "<Return>",
-            lambda event: window.destroy()
-        )
+        self.popup.bind("<Return>", self.close_popup)
 
-    # Show the settings
+    # Show settings and prepare an editable count
     def show_settings(self):
-        window, frame = self.dialog("Settings")
+        frame = self.make_popup("Settings")
 
-        # Lock the count while a game is active
-        locked = self.screen == "game"
-
-        # Keep changes separate until Done is pressed
-        draft = tk.IntVar(value=self.starting_objects)
+        self.count_locked = self.screen == "game"
+        self.settings_count = self.starting_objects
 
         self.label(
             frame,
             "Starting matches",
-            size=19,
+            19,
             bold=True
         ).pack(pady=(0, 8))
 
         self.label(
             frame,
-            "Default: 15  |  Minimum: 1  |  Maximum: 30",
-            size=12,
-            color=MUTED
+            f"Minimum: {game.MIN_OBJECTS}  |  "
+            f"Maximum: {game.MAX_OBJECTS}",
+            12,
+            LIGHT
         ).pack()
 
         controls = tk.Frame(frame, bg=BACKGROUND)
         controls.pack(pady=15)
 
-        # Update the count display and buttons
-        def update_count():
-            count_label.configure(text=str(draft.get()))
-
-            minus.configure(
-                state=(
-                    "disabled"
-                    if locked or draft.get() <= 1
-                    else "normal"
-                )
-            )
-
-            plus.configure(
-                state=(
-                    "disabled"
-                    if locked or draft.get() >= game.MAX_OBJECTS
-                    else "normal"
-                )
-            )
-
-        # Increase or decrease the count
-        def change_count(amount):
-            if not locked:
-                new_count = draft.get() + amount
-                new_count = max(
-                    1,
-                    min(game.MAX_OBJECTS, new_count)
-                )
-
-                draft.set(new_count)
-                update_count()
-
-        minus = self.button(
+        self.minus_button = self.button(
             controls,
             "-",
-            lambda: change_count(-1),
+            self.change_count,
+            value=-1,
             width=3
         )
-        minus.pack(side="left", padx=8)
-
-        count_label = self.label(
-            controls,
-            str(draft.get()),
-            size=28,
-            color=GOLD,
-            bold=True,
-            width=3
+        self.minus_button.widget.pack(
+            side="left",
+            padx=8
         )
-        count_label.pack(side="left", padx=10)
 
-        plus = self.button(
+        self.settings_number = self.label(
+            controls, "", 28, GOLD, True
+        )
+        self.settings_number.configure(width=3)
+        self.settings_number.pack(
+            side="left",
+            padx=10
+        )
+
+        self.plus_button = self.button(
             controls,
             "+",
-            lambda: change_count(1),
+            self.change_count,
+            value=1,
             width=3
         )
-        plus.pack(side="left", padx=8)
+        self.plus_button.widget.pack(
+            side="left",
+            padx=8
+        )
 
-        self.count_controls = (minus, plus)
-
-        # Restore the default count
-        def reset_count():
-            if not locked:
-                draft.set(game.INITIAL_OBJECTS)
-                update_count()
-
-        reset = self.button(
+        self.reset_button = self.button(
             frame,
             "Reset to 15",
-            reset_count
+            self.reset_count
         )
-        reset.pack(pady=(0, 10))
+        self.reset_button.widget.pack(pady=(0, 10))
 
-        if locked:
-            reset.configure(state="disabled")
-
+        if self.count_locked:
             self.label(
                 frame,
                 "Match count is locked during a game.",
-                size=13,
-                color=GOLD
+                13,
+                GOLD
             ).pack(pady=(0, 12))
 
-        update_count()
+        self.update_settings_count()
 
         tk.Frame(
             frame,
@@ -1363,20 +1242,19 @@ class NimApp(tk.Tk):
             height=1
         ).pack(fill="x", pady=10)
 
-        # Animation and sound settings
         options = (
             ("Animate AI moves", self.animations),
             ("Selection sound", self.sound)
         )
 
-        for title, variable in options:
+        for text, variable in options:
             tk.Checkbutton(
                 frame,
-                text=title,
+                text=text,
                 variable=variable,
-                font=(BUTTON_FONT, 14),
+                font=("Helvetica", 14),
                 bg=BACKGROUND,
-                fg=CREAM,
+                fg=WHITE,
                 selectcolor=PANEL,
                 activebackground=BACKGROUND,
                 activeforeground=GOLD,
@@ -1385,25 +1263,56 @@ class NimApp(tk.Tk):
                 pady=10
             ).pack(anchor="w")
 
-        # Save the count only outside an active game
-        def save():
-            if not locked and self.screen != "game":
-                self.starting_objects = game.initialize_game(
-                    draft.get()
-                )
-
-                self.update_count_note()
-
-            window.destroy()
-
         self.button(
             frame,
             "Done",
-            save,
+            self.save_settings,
             primary=True
-        ).pack(pady=(18, 0))
+        ).widget.pack(pady=(18, 0))
 
-        window.bind(
-            "<Return>",
-            lambda event: save()
+        self.popup.bind("<Return>", self.save_settings)
+
+    # Update the number and its button limits
+    def update_settings_count(self):
+        self.settings_number.configure(
+            text=str(self.settings_count)
         )
+
+        self.minus_button.set_enabled(
+            not self.count_locked
+            and self.settings_count > game.MIN_OBJECTS
+        )
+
+        self.plus_button.set_enabled(
+            not self.count_locked
+            and self.settings_count < game.MAX_OBJECTS
+        )
+
+        self.reset_button.set_enabled(
+            not self.count_locked
+        )
+
+    def change_count(self, amount):
+        if not self.count_locked and self.screen != "game":
+            new_count = self.settings_count + amount
+
+            if game.MIN_OBJECTS <= new_count <= game.MAX_OBJECTS:
+                self.settings_count = new_count
+
+            self.update_settings_count()
+
+    def reset_count(self):
+        if not self.count_locked and self.screen != "game":
+            self.settings_count = game.INITIAL_OBJECTS
+            self.update_settings_count()
+
+    # Save the starting count, never an active game's count
+    def save_settings(self, event=None):
+        if not self.count_locked and self.screen != "game":
+            self.starting_objects = game.initialize_game(
+                self.settings_count
+            )
+            self.update_count_note()
+
+        self.close_popup()
+        return "break"
