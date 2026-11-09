@@ -194,7 +194,7 @@ def play_game(remaining_objects, first_player, difficulty):
                 move = ai.greedy_ai(remaining_objects)
 
             elif difficulty == '3':
-                move = ai.minima_ai(remaining_objects, depth=3)
+                move = ai.minimax_ai(remaining_objects, depth=3)
 
             elif difficulty =='4':
                 move=ai.alpha_beta_ai(remaining_objects,depth=4)
