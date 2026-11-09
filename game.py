@@ -1,4 +1,3 @@
-
 # This is the game file
 from player import get_player_move
 import ai
