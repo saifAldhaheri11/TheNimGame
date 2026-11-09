@@ -2,6 +2,7 @@
 
 ## Project Overview
 
+
 This project is an interactive Python implementation of the **Nim Game**
 
 The game allows a human player to compete against an AI opponent using different decision-making and search algorithms.
