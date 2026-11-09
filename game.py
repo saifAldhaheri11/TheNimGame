@@ -2,9 +2,7 @@
 from player import get_player_move
 import ai
 
-
 INITIAL_OBJECTS = 15
-
 
 # Initialize the game
 def initialize_game(starting_objects=INITIAL_OBJECTS):
