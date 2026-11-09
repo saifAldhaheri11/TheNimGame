@@ -197,7 +197,7 @@ def play_game(remaining_objects, first_player, difficulty):
             elif difficulty == '3':
                 move = ai.minima_ai(remaining_objects, depth=3)
 
-            elif difficulty ='4':
+            elif difficulty =='4':
                 move=ai.alpha_beta_ai(remaining_objects,depth=4)
             else:
                 # Hard and Extreme are not implemented yet
