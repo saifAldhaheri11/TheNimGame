@@ -33,6 +33,9 @@ class GameSession:
         self.winner = None
         self.last_player = None
 
+        # Every move as (move number, player, removed, remaining after)
+        self.history = []
+
     # Get a move from the existing AI algorithms
     def choose_ai_move(self):
         if self.winner or self.current_player != "AI":
@@ -48,7 +51,8 @@ class GameSession:
         if self.difficulty == "Hard":
             return ai.minimax_ai(self.remaining, depth=3)
 
-        return ai.alpha_beta_ai(self.remaining, depth=4)
+        # Full-depth search, run fresh every turn
+        return ai.alpha_beta_ai(self.remaining)
 
     # Remove the selected matches and switch turns
     def remove(self, match_ids, player):
@@ -77,6 +81,10 @@ class GameSession:
         self.remaining = remaining
         self.moves_played += 1
         self.last_player = player
+
+        self.history.append(
+            (self.moves_played, player, len(ids), remaining)
+        )
 
         if game.is_game_over(remaining):
             self.winner = game.get_winner(player)

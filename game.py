@@ -218,10 +218,8 @@ def play_game(remaining_objects, first_player, difficulty):
                 )
 
             elif difficulty == "4":
-                move = ai.alpha_beta_ai(
-                    remaining_objects,
-                    depth=4
-                )
+                # Full-depth search, run fresh every turn
+                move = ai.alpha_beta_ai(remaining_objects)
 
             else:
                 print("Invalid difficulty.")

@@ -1,9 +1,12 @@
 # This file contains the graphical interface
 import math
+import time
 import tkinter as tk
-from tkinter import messagebox
 
 import game
+import scoring
+import sound
+from scoreboard import Scoreboard
 from session import DIFFICULTIES, GameSession
 
 
@@ -140,22 +143,140 @@ class ColorButton:
         self.paint()
 
 
+# An on/off switch with a title and a short description
+class ToggleSwitch:
+
+    def __init__(
+        self, parent, title, note, variable, scale=1.0,
+        on_change=None
+    ):
+        self.variable = variable
+        self.on_change = on_change
+        self.scale = scale
+        self.focused = False
+
+        self.widget = tk.Frame(
+            parent,
+            bg=parent.cget("bg"),
+            cursor="hand2",
+            takefocus=True,
+            highlightthickness=2,
+            highlightbackground=parent.cget("bg"),
+            highlightcolor=GOLD
+        )
+
+        text = tk.Frame(self.widget, bg=parent.cget("bg"))
+        text.pack(side="left", fill="x", expand=True, padx=(4, 30))
+
+        tk.Label(
+            text, text=title, bg=parent.cget("bg"), fg=WHITE,
+            font=("Helvetica", 15, "bold"), anchor="w"
+        ).pack(anchor="w")
+
+        tk.Label(
+            text, text=note, bg=parent.cget("bg"), fg=LIGHT,
+            font=("Helvetica", 11), anchor="w"
+        ).pack(anchor="w")
+
+        self.width = int(56 * scale)
+        self.height = int(30 * scale)
+
+        self.switch = tk.Canvas(
+            self.widget,
+            width=self.width,
+            height=self.height,
+            bg=parent.cget("bg"),
+            highlightthickness=0
+        )
+        self.switch.pack(side="right", padx=4)
+
+        for widget in (self.widget, text, self.switch) + tuple(
+            text.winfo_children()
+        ):
+            widget.bind("<Button-1>", self.toggle)
+
+        self.widget.bind("<space>", self.toggle)
+        self.widget.bind("<Return>", self.toggle)
+
+        self.paint()
+
+    # Draw the pill-shaped track and the round knob
+    def paint(self):
+        canvas = self.switch
+        canvas.delete("all")
+
+        on = self.variable.get()
+        w, h = self.width, self.height
+        r = h / 2
+        track = GOLD if on else "#3B5A4A"
+
+        canvas.create_oval(0, 0, h, h, fill=track, outline="")
+        canvas.create_oval(w - h, 0, w, h, fill=track, outline="")
+        canvas.create_rectangle(r, 0, w - r, h, fill=track, outline="")
+
+        pad = 3 * self.scale
+        x = w - h if on else 0
+
+        canvas.create_oval(
+            x + pad, pad, x + h - pad, h - pad,
+            fill=WHITE if on else LIGHT,
+            outline=""
+        )
+
+    def toggle(self, event=None):
+        self.variable.set(not self.variable.get())
+        self.widget.focus_set()
+        self.paint()
+
+        if self.on_change is not None:
+            self.on_change()
+
+        return "break"
+
+
 # An ordinary class that contains the window
 class NimApp:
 
     def __init__(self):
+        # Fix blurry text on Windows: tell Windows this app handles
+        # high-DPI screens itself instead of stretching a small image
+        try:
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except (AttributeError, OSError, ImportError):
+            pass  # Not Windows, or an older Windows version
+
         self.window = tk.Tk()
         self.window.title("The NIM Game - Intro to AI Project")
-        self.window.geometry("1040x850")
-        self.window.minsize(800, 720)
         self.window.configure(bg=BACKGROUND)
+
+        # Screen scale: 1.0 at 100% Windows scaling, 1.5 at 150%
+        self.scale = max(1.0, self.window.winfo_fpixels("1i") / 96)
+        self.turn_started = None
+
+        width = min(
+            self.px(1100),
+            self.window.winfo_screenwidth() - 40
+        )
+        height = min(
+            self.px(860),
+            self.window.winfo_screenheight() - 80
+        )
+        self.window.geometry(f"{width}x{height}")
+        self.window.minsize(
+            min(self.px(900), width),
+            min(self.px(700), height)
+        )
 
         self.difficulty = "Medium"
         self.first_player = "Player"
         self.starting_objects = game.INITIAL_OBJECTS
 
-        self.screen = "setup"
+        self.scoreboard = Scoreboard()
+
+        self.screen = "menu"
         self.session = None
+        self.dialog = None
 
         self.selected = set()
         self.ai_highlight = set()
@@ -163,7 +284,6 @@ class NimApp:
         self.hovered_match = None
 
         self.pending = None
-        self.popup = None
         self.buttons = []
 
         self.animations = tk.BooleanVar(
@@ -172,14 +292,23 @@ class NimApp:
         )
         self.sound = tk.BooleanVar(
             master=self.window,
-            value=False
+            value=True
         )
 
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.window.bind("<Return>", self.enter_key)
-        self.window.bind("<Escape>", self.clear_selection)
+        self.window.bind("<Escape>", self.escape_key)
 
-        self.show_setup()
+        self.show_menu()
+
+    # Convert a size in pixels at 100% scaling to this screen
+    def px(self, value):
+        return int(value * self.scale)
+
+    # Play a sound effect if sounds are turned on
+    def play(self, name):
+        if self.sound.get():
+            sound.play(name, self.window)
 
     # Keep the existing main.py working
     def mainloop(self):
@@ -235,48 +364,46 @@ class NimApp:
             self.window.after_cancel(self.pending)
             self.pending = None
 
-    # Build the shared top bar
-    def shell(self):
+    # Clear the window for a new page.
+    # Every page is drawn inside the same window, no popups.
+    def shell(self, title=None, back=None):
         self.cancel_pending()
 
         for widget in self.window.winfo_children():
             widget.destroy()
 
-        self.popup = None
         self.buttons = []
+        self.dialog = None
 
-        header = tk.Frame(
-            self.window,
-            bg=BACKGROUND,
-            padx=28,
-            pady=14
-        )
-        header.pack(fill="x")
+        # Only menu pages get a top bar, the game uses the full window
+        if title is not None:
+            header = tk.Frame(
+                self.window,
+                bg=BACKGROUND,
+                padx=28,
+                pady=14
+            )
+            header.pack(fill="x")
 
-        self.label(
-            header,
-            "The NIM Game",
-            34,
-            bold=True
-        ).pack(side="left")
+            if back is not None:
+                self.button(
+                    header,
+                    "\u2190  Back",
+                    back
+                ).widget.pack(side="left", padx=(0, 18))
 
-        self.button(
-            header,
-            "Settings",
-            self.show_settings
-        ).widget.pack(side="right", padx=(12, 0))
+            self.label(
+                header,
+                title,
+                30,
+                bold=True
+            ).pack(side="left")
 
-        self.button(
-            header,
-            "How to Play",
-            self.show_rules
-        ).widget.pack(side="right")
-
-        tk.Frame(
-            self.window,
-            bg=BORDER,
-            height=1
-        ).pack(fill="x")
+            tk.Frame(
+                self.window,
+                bg=BORDER,
+                height=1
+            ).pack(fill="x")
 
         self.body = tk.Frame(
             self.window,
@@ -289,32 +416,81 @@ class NimApp:
             pady=16
         )
 
-    # Show the setup screen
-    def show_setup(self):
-        self.screen = "setup"
+    # Start page
+    def show_menu(self):
+        self.screen = "menu"
         self.shell()
 
         content = tk.Frame(self.body, bg=BACKGROUND)
-        content.pack(expand=True)
+        content.place(relx=0.5, rely=0.45, anchor="center")
 
         art = tk.Canvas(
             content,
-            width=200,
-            height=78,
+            width=self.px(200),
+            height=self.px(78),
             bg=BACKGROUND,
             highlightthickness=0
         )
         art.pack(pady=(0, 8))
 
         for x, y in ((66, 18), (100, 5), (134, 18)):
-            self.draw_match(art, x, y, 48)
+            self.draw_match(
+                art, self.px(x), self.px(y), self.px(48)
+            )
 
         self.label(
             content,
-            "Choose your difficulty",
-            25,
+            "The NIM Game",
+            44,
             bold=True
-        ).pack(pady=(0, 14))
+        ).pack()
+
+        self.label(
+            content,
+            "Take the last match and you lose.",
+            15,
+            LIGHT
+        ).pack(pady=(0, 26))
+
+        pages = (
+            ("PLAY", self.show_setup, True),
+            ("Settings", self.show_settings, False),
+            ("How to Play", self.show_rules, False),
+            ("Stats", self.show_stats, False),
+            ("Quit", self.close, False)
+        )
+
+        first = None
+
+        for text, command, primary in pages:
+            button = self.button(
+                content,
+                text,
+                command,
+                primary=primary,
+                width=22
+            )
+            button.widget.pack(pady=6, ipady=2)
+
+            if first is None:
+                first = button
+
+        first.widget.focus_set()
+
+    # Play page: choose every game setting, then start
+    def show_setup(self):
+        self.screen = "setup"
+        self.shell("Game Setup", self.show_menu)
+
+        content = tk.Frame(self.body, bg=BACKGROUND)
+        content.place(relx=0.5, rely=0.45, anchor="center")
+
+        self.label(
+            content,
+            "Difficulty",
+            22,
+            bold=True
+        ).pack(pady=(0, 10))
 
         # Difficulty choices
         grid = tk.Frame(content, bg=BACKGROUND)
@@ -344,9 +520,9 @@ class NimApp:
         self.label(
             content,
             "Who starts?",
-            21,
+            22,
             bold=True
-        ).pack(pady=(14, 8))
+        ).pack(pady=(18, 8))
 
         # Starting player choices
         choices = tk.Frame(content, bg=BACKGROUND)
@@ -369,25 +545,63 @@ class NimApp:
         self.opening_note = self.label(
             content, "", 12, LIGHT
         )
-        self.opening_note.pack(pady=8)
+        self.opening_note.pack(pady=6)
 
-        self.count_note = self.label(
-            content, "", 15, GOLD
+        self.label(
+            content,
+            "Starting matches",
+            22,
+            bold=True
+        ).pack(pady=(10, 4))
+
+        self.label(
+            content,
+            f"Minimum: {game.MIN_OBJECTS}  |  "
+            f"Maximum: {game.MAX_OBJECTS}",
+            12,
+            LIGHT
+        ).pack()
+
+        controls = tk.Frame(content, bg=BACKGROUND)
+        controls.pack(pady=10)
+
+        self.minus_button = self.button(
+            controls, "-", self.change_count,
+            value=-1, width=3
         )
-        self.count_note.pack(pady=(0, 10))
+        self.minus_button.widget.pack(side="left", padx=8)
 
-        self.update_count_note()
+        self.count_number = self.label(
+            controls, "", 28, GOLD, True
+        )
+        self.count_number.configure(width=3)
+        self.count_number.pack(side="left", padx=10)
 
-        self.button(
+        self.plus_button = self.button(
+            controls, "+", self.change_count,
+            value=1, width=3
+        )
+        self.plus_button.widget.pack(side="left", padx=8)
+
+        self.reset_button = self.button(
+            controls,
+            f"Reset to {game.INITIAL_OBJECTS}",
+            self.reset_count
+        )
+        self.reset_button.widget.pack(side="left", padx=(18, 0))
+
+        self.start_button = self.button(
             content,
             "Start Game",
             self.start_game,
             primary=True,
             width=29
-        ).widget.pack(pady=8)
+        )
+        self.start_button.widget.pack(pady=(22, 0))
 
         self.choose_difficulty(self.difficulty)
         self.choose_first(self.first_player)
+        self.update_count()
 
     def choose_difficulty(self, level):
         self.difficulty = level
@@ -408,11 +622,345 @@ class NimApp:
 
         self.opening_note.configure(text=text)
 
-    def update_count_note(self):
-        if self.screen == "setup":
-            self.count_note.configure(
-                text=f"Starting matches: {self.starting_objects}"
+    # Show the match count and its button limits
+    def update_count(self):
+        self.count_number.configure(
+            text=str(self.starting_objects)
+        )
+
+        self.minus_button.set_enabled(
+            self.starting_objects > game.MIN_OBJECTS
+        )
+        self.plus_button.set_enabled(
+            self.starting_objects < game.MAX_OBJECTS
+        )
+
+    def change_count(self, amount):
+        new_count = self.starting_objects + amount
+
+        if game.MIN_OBJECTS <= new_count <= game.MAX_OBJECTS:
+            self.starting_objects = game.initialize_game(new_count)
+
+        self.update_count()
+
+    def reset_count(self):
+        self.starting_objects = game.INITIAL_OBJECTS
+        self.update_count()
+
+    # Settings page
+    def show_settings(self):
+        self.screen = "settings"
+        self.shell("Settings", self.show_menu)
+
+        content = tk.Frame(self.body, bg=BACKGROUND)
+        content.place(relx=0.5, rely=0.35, anchor="center")
+
+        panel = tk.Frame(
+            content,
+            bg=PANEL,
+            padx=self.px(28),
+            pady=self.px(10),
+            highlightthickness=1,
+            highlightbackground=BORDER
+        )
+        panel.pack()
+
+        options = (
+            (
+                "Animate AI moves",
+                "Highlight the AI's matches before removing them",
+                self.animations
+            ),
+            (
+                "Sound effects",
+                "Play sounds for selecting, moves, wins and losses",
+                self.sound
             )
+        )
+
+        for index, (title, note, variable) in enumerate(options):
+            if index > 0:
+                tk.Frame(
+                    panel, bg=BORDER, height=1
+                ).pack(fill="x")
+
+            ToggleSwitch(
+                panel, title, note, variable, self.scale,
+                on_change=lambda: self.play("click")
+            ).widget.pack(fill="x", pady=self.px(12))
+
+        self.label(
+            content,
+            "Difficulty, first player and match count "
+            "are chosen on the PLAY page.",
+            13,
+            LIGHT
+        ).pack(pady=(20, 0))
+
+    # How to Play page: picture cards for each rule
+    def show_rules(self):
+        self.screen = "rules"
+        self.shell("How to Play", self.show_menu)
+
+        grid = tk.Frame(self.body, bg=BACKGROUND)
+        grid.place(relx=0.5, rely=0.5, anchor="center")
+
+        cards = (
+            (
+                "1. One pile of matches",
+                "The game starts with one pile\n"
+                "(15 by default, 5 to 30 on the PLAY page).",
+                self.picture_pile
+            ),
+            (
+                "2. Take 1, 2 or 3",
+                "Click matches to select them,\n"
+                "then press Remove matches.",
+                self.picture_select
+            ),
+            (
+                "3. Take turns",
+                "You and the AI take turns.\n"
+                "If the AI starts, its first move is random.",
+                self.picture_turns
+            ),
+            (
+                "4. Don't take the last one",
+                "Whoever removes the last match\n"
+                "LOSES the game.",
+                self.picture_last
+            ),
+            (
+                "5. Score points",
+                "Best move +100, other move +20,\n"
+                "speed up to +50, win +500, x difficulty.",
+                self.picture_score
+            ),
+            (
+                "6. Keyboard",
+                "Tab to the board, arrows to move,\n"
+                "Space select, Enter remove, Esc clear.",
+                self.picture_keys
+            )
+        )
+
+        for index, (title, text, draw) in enumerate(cards):
+            card = tk.Frame(
+                grid,
+                bg=PANEL,
+                padx=self.px(14),
+                pady=self.px(12),
+                highlightthickness=1,
+                highlightbackground=BORDER
+            )
+            card.grid(
+                row=index // 3,
+                column=index % 3,
+                padx=self.px(8),
+                pady=self.px(8),
+                sticky="nsew"
+            )
+
+            picture = tk.Canvas(
+                card,
+                width=self.px(250),
+                height=self.px(120),
+                bg=BOARD,
+                highlightthickness=0
+            )
+            picture.pack()
+            draw(picture, self.px(250), self.px(120))
+
+            self.label(
+                card, title, 15, GOLD, True
+            ).pack(anchor="w", pady=(self.px(10), 2))
+
+            caption = self.label(card, text, 12, LIGHT)
+            caption.configure(justify="left")
+            caption.pack(anchor="w")
+
+    # Small pictures for the How to Play cards
+    def picture_row(self, canvas, width, height, count,
+                    selected=(), y=None, size=None):
+        size = size or height * 0.55
+        y = (height - size) / 2 if y is None else y
+        gap = width / (count + 1)
+
+        for index in range(count):
+            self.draw_match(
+                canvas,
+                gap * (index + 1),
+                y,
+                size,
+                selected=index in selected
+            )
+
+    def picture_pile(self, canvas, width, height):
+        self.picture_row(canvas, width, height, 7)
+
+    def picture_select(self, canvas, width, height):
+        self.picture_row(
+            canvas, width, height, 5, selected=(3, 4)
+        )
+        canvas.create_text(
+            width * 0.83, height * 0.9,
+            text="selected", fill=GOLD,
+            font=("Helvetica", 10, "bold")
+        )
+
+    def picture_turns(self, canvas, width, height):
+        def badge(x, text, fill, color):
+            canvas.create_rectangle(
+                x - self.px(40), height / 2 - self.px(20),
+                x + self.px(40), height / 2 + self.px(20),
+                fill=fill, outline=BORDER, width=2
+            )
+            canvas.create_text(
+                x, height / 2, text=text, fill=color,
+                font=("Times", 15, "bold")
+            )
+
+        badge(width * 0.25, "You", GOLD, BACKGROUND)
+        badge(width * 0.75, "AI", PANEL, WHITE)
+
+        for direction in (-1, 1):
+            y = height / 2 + direction * self.px(32)
+            start, end = width * 0.38, width * 0.62
+
+            if direction > 0:
+                start, end = end, start
+
+            canvas.create_line(
+                start, y, end, y,
+                fill=WHITE, width=3, arrow="last",
+                arrowshape=(10, 12, 5)
+            )
+
+    def picture_last(self, canvas, width, height):
+        size = height * 0.6
+        self.draw_match(canvas, width / 2, height * 0.18, size)
+
+        # Red cross over the last match
+        cross = self.px(26)
+        center_y = height * 0.18 + size / 2
+
+        for dx in (-1, 1):
+            canvas.create_line(
+                width / 2 - cross, center_y - cross * dx,
+                width / 2 + cross, center_y + cross * dx,
+                fill="#FF4F5E", width=6, capstyle="round"
+            )
+
+        canvas.create_text(
+            width / 2, height * 0.9,
+            text="LOSE", fill="#FF8A93",
+            font=("Helvetica", 12, "bold")
+        )
+
+    def picture_score(self, canvas, width, height):
+        canvas.create_text(
+            width / 2, height * 0.32,
+            text="1,950", fill=GOLD,
+            font=("Times", 30, "bold")
+        )
+        canvas.create_text(
+            width / 2, height * 0.68,
+            text="* best move   +100",
+            fill=WHITE,
+            font=("Courier", 12, "bold")
+        )
+        canvas.create_text(
+            width / 2, height * 0.86,
+            text="fast choice  +50",
+            fill=LIGHT,
+            font=("Courier", 11)
+        )
+
+    def picture_keys(self, canvas, width, height):
+        keys = (
+            ("Tab", 0.17, 0.3), ("←", 0.42, 0.3),
+            ("→", 0.58, 0.3), ("Esc", 0.83, 0.3),
+            ("Space", 0.3, 0.7), ("Enter", 0.7, 0.7)
+        )
+
+        for text, fx, fy in keys:
+            x, y = width * fx, height * fy
+            half = self.px(30 if len(text) > 2 else 18)
+
+            canvas.create_rectangle(
+                x - half, y - self.px(17),
+                x + half, y + self.px(17),
+                fill=BACKGROUND, outline=BORDER, width=2
+            )
+            canvas.create_text(
+                x, y, text=text, fill=WHITE,
+                font=("Helvetica", 11, "bold")
+            )
+
+    # Stats page: wins, losses and high scores for every difficulty
+    def show_stats(self):
+        self.screen = "stats"
+        self.shell("Stats", self.show_menu)
+
+        content = tk.Frame(self.body, bg=BACKGROUND)
+        content.place(relx=0.5, rely=0.4, anchor="center")
+
+        table = tk.Frame(content, bg=PANEL, padx=26, pady=18)
+        table.pack()
+
+        headings = (
+            "Difficulty", "Wins", "Losses", "Win rate", "High score"
+        )
+
+        for column, text in enumerate(headings):
+            self.label(
+                table, text, 16, GOLD, True
+            ).grid(row=0, column=column, padx=16, pady=(0, 8))
+
+        rows = [
+            (level, record["wins"], record["losses"], record["best"])
+            for level, record in self.scoreboard.scores.items()
+        ]
+        rows.append(
+            ("Total",)
+            + self.scoreboard.totals()
+            + (self.scoreboard.best_overall(),)
+        )
+
+        for row, (name, wins, losses, best) in enumerate(
+            rows, start=1
+        ):
+            played = wins + losses
+            rate = f"{100 * wins / played:.0f}%" if played else "-"
+            bold = name == "Total"
+
+            for column, value in enumerate(
+                (name, wins, losses, rate, f"{best:,}")
+            ):
+                self.label(
+                    table,
+                    str(value),
+                    15,
+                    WHITE if not bold else GOLD,
+                    bold
+                ).grid(row=row, column=column, padx=16, pady=3)
+
+        self.button(
+            content,
+            "Reset scores",
+            self.reset_scores
+        ).widget.pack(pady=(20, 0))
+
+    def reset_scores(self):
+        def reset():
+            self.scoreboard.reset()
+            self.show_stats()
+
+        self.confirm(
+            "Reset scores",
+            "Clear the win/loss record for every difficulty?",
+            reset
+        )
 
     # Create the game screen
     def start_game(self):
@@ -427,8 +975,16 @@ class NimApp:
         self.focus_match = None
         self.hovered_match = None
 
+        # Scoring for this game
+        self.score = scoring.ScoreKeeper(self.difficulty)
+        self.move_notes = {}
+        self.turn_started = time.monotonic()
+
         self.screen = "game"
         self.shell()
+
+        # Packed first on the right so the board fills the rest
+        self.build_side_panel()
 
         starter = "You started"
 
@@ -546,7 +1102,7 @@ class NimApp:
         self.button(
             bottom,
             "Leave Game",
-            self.back_to_setup
+            self.back_to_menu
         ).widget.pack(side="left")
 
         self.button(
@@ -562,6 +1118,112 @@ class NimApp:
                 650,
                 self.ai_turn
             )
+
+    # Side panel with this difficulty's record and the move history
+    def build_side_panel(self):
+        side = tk.Frame(
+            self.body,
+            bg=PANEL,
+            padx=16,
+            pady=12,
+            highlightthickness=1,
+            highlightbackground=BORDER
+        )
+        side.pack(side="right", fill="y", padx=(16, 0))
+
+        self.label(
+            side, "Score", 16, bold=True
+        ).pack(anchor="w")
+
+        self.score_label = self.label(side, "0", 26, GOLD, True)
+        self.score_label.pack(anchor="w")
+
+        self.label(
+            side,
+            f"x{self.score.multiplier:g} for {self.session.difficulty}",
+            12,
+            LIGHT
+        ).pack(anchor="w")
+
+        tk.Frame(
+            side, bg=BORDER, height=1
+        ).pack(fill="x", pady=12)
+
+        self.label(
+            side, f"Record vs {self.session.difficulty}", 16, bold=True
+        ).pack(anchor="w")
+
+        self.record_label = self.label(side, "", 14, GOLD, True)
+        self.record_label.pack(anchor="w", pady=(2, 0))
+
+        tk.Frame(
+            side, bg=BORDER, height=1
+        ).pack(fill="x", pady=12)
+
+        self.label(
+            side, "Move history", 16, bold=True
+        ).pack(anchor="w")
+
+        history = tk.Frame(side, bg=PANEL)
+        history.pack(fill="both", expand=True, pady=(6, 0))
+
+        scrollbar = tk.Scrollbar(history)
+        scrollbar.pack(side="right", fill="y")
+
+        self.history_list = tk.Listbox(
+            history,
+            width=26,
+            bg=BACKGROUND,
+            fg=WHITE,
+            font=("Courier", 12),
+            borderwidth=0,
+            highlightthickness=0,
+            activestyle="none",
+            selectbackground=BACKGROUND,
+            selectforeground=WHITE,
+            takefocus=False,
+            yscrollcommand=scrollbar.set
+        )
+        self.history_list.pack(side="left", fill="both", expand=True)
+        scrollbar.configure(command=self.history_list.yview)
+
+        self.update_record()
+
+    def update_record(self):
+        record = self.scoreboard.scores[self.session.difficulty]
+        self.record_label.configure(
+            text=f"Wins {record['wins']}   Losses {record['losses']}"
+        )
+
+    def update_score(self):
+        self.score_label.configure(
+            text=f"{self.score.total():,}"
+        )
+
+    def update_history(self):
+        self.update_score()
+        self.history_list.delete(0, "end")
+
+        for number, player, removed, left in self.session.history:
+            who = "You" if player == "Player" else "AI"
+            note = ""
+
+            if number in self.move_notes:
+                points, on_path = self.move_notes[number]
+                star = "*" if on_path else " "
+                note = f" {star}+{points}"
+
+            self.history_list.insert(
+                "end",
+                f"{number:>2}. {who:<3} -{removed} ({left:>2}){note}"
+            )
+
+            if player == "AI":
+                self.history_list.itemconfigure(
+                    "end", fg=GOLD
+                )
+
+        self.history_list.see("end")
 
     # Draw a match and its glow
     def draw_match(
@@ -682,7 +1344,7 @@ class NimApp:
             self.session.starting_objects / self.columns
         )
         row_height = height / rows
-        match_height = min(100, row_height * 0.58)
+        match_height = min(self.px(100), row_height * 0.58)
 
         self.hitboxes = {}
 
@@ -725,13 +1387,14 @@ class NimApp:
             )
 
             self.hitboxes[match] = (
-                x - 25, y - 12,
-                x + 25, y + match_height + 12
+                x - self.px(25), y - self.px(12),
+                x + self.px(25), y + match_height + self.px(12)
             )
 
     def human_turn(self):
         return (
             self.screen == "game"
+            and self.dialog is None
             and not self.session.winner
             and self.session.current_player == "Player"
         )
@@ -828,9 +1491,11 @@ class NimApp:
 
         if match in self.selected:
             self.selected.remove(match)
+            self.play("deselect")
 
         elif len(self.selected) < 3:
             self.selected.add(match)
+            self.play("select")
 
         else:
             self.feedback.configure(
@@ -840,10 +1505,6 @@ class NimApp:
             return
 
         self.feedback.configure(text="")
-
-        if self.sound.get():
-            self.window.bell()
-
         self.refresh()
 
     def clear_selection(self, event=None):
@@ -891,6 +1552,7 @@ class NimApp:
         )
 
         self.selection_label.configure(text=selection)
+        self.update_history()
 
         text = "Remove matches"
 
@@ -913,18 +1575,35 @@ class NimApp:
             return
 
         count = len(self.selected)
+        remaining_before = self.session.remaining
+        seconds = time.monotonic() - self.turn_started
 
         self.session.remove(
             sorted(self.selected),
             "Player"
         )
 
+        # Score the move: best-path bonus and speed bonus
+        points, on_path = self.score.add_move(
+            remaining_before, count, seconds
+        )
+        self.move_notes[self.session.moves_played] = (
+            points, on_path
+        )
+
         self.selected.clear()
         self.hovered_match = None
+        self.play("remove")
 
-        self.feedback.configure(
-            text="You removed " + self.match_text(count) + "."
+        text = (
+            f"You removed {self.match_text(count)} "
+            f"in {seconds:.1f}s.  +{points} points"
         )
+
+        if on_path:
+            text += "  (best move!)"
+
+        self.feedback.configure(text=text)
 
         self.refresh()
 
@@ -978,6 +1657,8 @@ class NimApp:
             text="AI removed " + self.match_text(count) + "."
         )
 
+        self.play("ai_move")
+        self.turn_started = time.monotonic()
         self.refresh()
 
         if self.session.winner:
@@ -988,21 +1669,24 @@ class NimApp:
         self.cancel_pending()
         self.screen = "result"
 
+        player_won = self.session.winner == "Player"
+        self.score.finish(player_won)
+        total = self.score.total()
+
+        new_best = self.scoreboard.record(
+            self.session.difficulty,
+            self.session.winner,
+            total
+        )
+        self.update_record()
+        self.update_score()
+        self.play("win" if player_won else "lose")
+
         self.turn_label.configure(text="GAME OVER")
         self.selection_label.configure(text="")
 
         self.remove_button.set_enabled(False)
         self.clear_button.set_enabled(False)
-
-        card = tk.Frame(
-            self.body,
-            bg=BACKGROUND,
-            highlightbackground=GOLD,
-            highlightthickness=2,
-            padx=40,
-            pady=22
-        )
-        card.place(relx=0.5, rely=0.5, anchor="center")
 
         title = "AI WINS"
         reason = "You took the last match."
@@ -1011,13 +1695,32 @@ class NimApp:
             title = "YOU WIN!"
             reason = "The AI took the last match."
 
+        card = self.card(self.board)
+
         self.label(
             card, title, 32, bold=True
         ).pack(pady=10)
 
         self.label(
             card, reason, 15
-        ).pack(pady=(0, 18))
+        ).pack(pady=(0, 10))
+
+        self.label(
+            card, f"Score: {total:,}", 24, GOLD, True
+        ).pack()
+
+        details = (
+            f"Best moves: {self.score.best_count} of "
+            f"{self.score.player_moves}   |   "
+            f"x{self.score.multiplier:g} {self.session.difficulty}"
+        )
+
+        if new_best:
+            details += "\nNew high score!"
+
+        self.label(
+            card, details, 13, LIGHT
+        ).pack(pady=(2, 16))
 
         self.button(
             card,
@@ -1029,43 +1732,139 @@ class NimApp:
 
         self.button(
             card,
-            "Change Settings",
+            "Change Setup",
             self.show_setup,
             width=22
         ).widget.pack(pady=5)
 
-    # Confirm before leaving an unfinished game
-    def confirm_leave(self, title, question):
-        if self.screen != "game":
-            return True
+        self.button(
+            card,
+            "Main Menu",
+            self.show_menu,
+            width=22
+        ).widget.pack(pady=5)
 
-        return messagebox.askyesno(
-            title,
-            question,
-            parent=self.window
+    # A bordered box drawn on top of the page
+    def card(self, over):
+        card = tk.Frame(
+            self.body if over is None else over.master,
+            bg=BACKGROUND,
+            highlightbackground=GOLD,
+            highlightthickness=2,
+            padx=40,
+            pady=22
         )
+        card.place(
+            in_=over if over is not None else self.body,
+            relx=0.5,
+            rely=0.5,
+            anchor="center"
+        )
+        card.lift()
+        return card
+
+    # Yes/No question shown inside the game window
+    def confirm(self, title, question, on_yes):
+        if self.dialog is not None:
+            return
+
+        # Pause the AI and the move timer while the question is open
+        was_waiting = self.pending is not None
+        self.cancel_pending()
+        opened = time.monotonic()
+
+        over = self.board if self.screen == "game" else None
+        self.dialog = self.card(over)
+
+        self.label(
+            self.dialog, title, 26, bold=True
+        ).pack(pady=(4, 8))
+
+        self.label(
+            self.dialog, question, 15
+        ).pack(pady=(0, 18))
+
+        choices = tk.Frame(self.dialog, bg=BACKGROUND)
+        choices.pack()
+
+        def yes():
+            self.close_dialog()
+            on_yes()
+
+        def no():
+            self.close_dialog()
+
+            if self.turn_started is not None:
+                self.turn_started += time.monotonic() - opened
+
+            if was_waiting and self.screen == "game":
+                self.pending = self.window.after(
+                    300, self.ai_turn
+                )
+
+        self.dialog_no = no
+
+        no_button = self.button(choices, "No", no, width=10)
+        no_button.widget.pack(side="left", padx=8)
+
+        self.button(
+            choices, "Yes", yes, primary=True, width=10
+        ).widget.pack(side="left", padx=8)
+
+        no_button.widget.focus_set()
+
+        if self.screen == "game":
+            self.refresh()
+
+    def close_dialog(self):
+        if self.dialog is not None:
+            self.buttons = [
+                button
+                for button in self.buttons
+                if button.widget.winfo_exists()
+                and not str(button.widget).startswith(
+                    str(self.dialog)
+                )
+            ]
+            self.dialog.destroy()
+            self.dialog = None
+
+            if self.screen == "game":
+                self.refresh()
 
     def restart(self):
-        if self.confirm_leave(
-            "Restart Game",
-            "Restart this game? "
-        ):
+        if self.screen == "game":
+            self.confirm(
+                "Restart Game",
+                "Restart this game?",
+                self.start_game
+            )
+        else:
             self.start_game()
 
-    def back_to_setup(self):
-        if self.confirm_leave(
-            "Leave Game",
-            "Leave this game? "
-        ):
-            self.show_setup()
+    def back_to_menu(self):
+        if self.screen == "game":
+            self.confirm(
+                "Leave Game",
+                "Leave this game and go to the main menu?",
+                self.show_menu
+            )
+        else:
+            self.show_menu()
 
     def close(self):
-        if self.confirm_leave(
-            "Close Game",
-            "Close this game? "
-        ):
+        def quit_game():
             self.cancel_pending()
             self.window.destroy()
+
+        if self.screen == "game":
+            self.confirm(
+                "Quit",
+                "Quit in the middle of this game?",
+                quit_game
+            )
+        else:
+            quit_game()
 
     def enter_key(self, event):
         focused = self.window.focus_get()
@@ -1075,6 +1874,9 @@ class NimApp:
                 button.activate()
                 return "break"
 
+        if self.dialog is not None:
+            return "break"
+
         if self.screen == "setup":
             self.start_game()
 
@@ -1083,236 +1885,14 @@ class NimApp:
 
         return "break"
 
-    # Create a popup window
-    def make_popup(self, title):
-        self.close_popup()
+    def escape_key(self, event):
+        if self.dialog is not None:
+            self.dialog_no()
 
-        self.popup = tk.Toplevel(self.window)
-        self.popup.title(title)
-        self.popup.configure(bg=BACKGROUND)
-        self.popup.resizable(False, False)
-        self.popup.transient(self.window)
-        self.popup.grab_set()
+        elif self.screen == "game":
+            self.clear_selection()
 
-        self.popup.protocol(
-            "WM_DELETE_WINDOW",
-            self.close_popup
-        )
-        self.popup.bind("<Escape>", self.close_popup)
+        elif self.screen in ("setup", "settings", "rules", "stats"):
+            self.show_menu()
 
-        x = self.window.winfo_rootx() + 100
-        y = self.window.winfo_rooty() + 100
-        self.popup.geometry(f"+{x}+{y}")
-
-        frame = tk.Frame(
-            self.popup,
-            bg=BACKGROUND,
-            padx=30,
-            pady=24
-        )
-        frame.pack(fill="both", expand=True)
-
-        self.label(
-            frame, title, 26, bold=True
-        ).pack(pady=(0, 18))
-
-        return frame
-
-    def close_popup(self, event=None):
-        if self.popup is not None:
-            self.buttons = [
-                button
-                for button in self.buttons
-                if button.widget.winfo_toplevel() != self.popup
-            ]
-
-            self.popup.destroy()
-            self.popup = None
-
-        return "break"
-
-    # Show the rules
-    def show_rules(self):
-        frame = self.make_popup("How to Play")
-
-        text = (
-            "- Choose 5-30 starting matches in Settings.\n"
-            "- Take turns removing 1, 2, or 3 matches.\n"
-            "- Whoever takes the last match loses.\n"
-            "- Click matches to select or deselect them.\n"
-            "- You can select across all rows.\n"
-            "- Press Remove to confirm your move.\n"
-            "- If AI starts, its opening move is random.\n"
-            "- All matchsticks belong to one pile.\n"
-            "- Keyboard: (Tab) to the board, (arrows) to move,\n"
-            "(space) to select, (Enter) to remove, (Esc) to clear."
-        )
-
-        rules = self.label(frame, text, 15)
-        rules.configure(justify="left")
-        rules.pack(pady=(0, 20))
-
-        self.button(
-            frame,
-            "Got it",
-            self.close_popup,
-            primary=True
-        ).widget.pack()
-
-        self.popup.bind("<Return>", self.close_popup)
-
-    # Show settings and prepare an editable count
-    def show_settings(self):
-        frame = self.make_popup("Settings")
-
-        self.count_locked = self.screen == "game"
-        self.settings_count = self.starting_objects
-
-        self.label(
-            frame,
-            "Starting matches",
-            19,
-            bold=True
-        ).pack(pady=(0, 8))
-
-        self.label(
-            frame,
-            f"Minimum: {game.MIN_OBJECTS}  |  "
-            f"Maximum: {game.MAX_OBJECTS}",
-            12,
-            LIGHT
-        ).pack()
-
-        controls = tk.Frame(frame, bg=BACKGROUND)
-        controls.pack(pady=15)
-
-        self.minus_button = self.button(
-            controls,
-            "-",
-            self.change_count,
-            value=-1,
-            width=3
-        )
-        self.minus_button.widget.pack(
-            side="left",
-            padx=8
-        )
-
-        self.settings_number = self.label(
-            controls, "", 28, GOLD, True
-        )
-        self.settings_number.configure(width=3)
-        self.settings_number.pack(
-            side="left",
-            padx=10
-        )
-
-        self.plus_button = self.button(
-            controls,
-            "+",
-            self.change_count,
-            value=1,
-            width=3
-        )
-        self.plus_button.widget.pack(
-            side="left",
-            padx=8
-        )
-
-        self.reset_button = self.button(
-            frame,
-            "Reset to 15",
-            self.reset_count
-        )
-        self.reset_button.widget.pack(pady=(0, 10))
-
-        if self.count_locked:
-            self.label(
-                frame,
-                "Match count is locked during a game.",
-                13,
-                GOLD
-            ).pack(pady=(0, 12))
-
-        self.update_settings_count()
-
-        tk.Frame(
-            frame,
-            bg=BORDER,
-            height=1
-        ).pack(fill="x", pady=10)
-
-        options = (
-            ("Animate AI moves", self.animations),
-            ("Selection sound", self.sound)
-        )
-
-        for text, variable in options:
-            tk.Checkbutton(
-                frame,
-                text=text,
-                variable=variable,
-                font=("Helvetica", 14),
-                bg=BACKGROUND,
-                fg=WHITE,
-                selectcolor=PANEL,
-                activebackground=BACKGROUND,
-                activeforeground=GOLD,
-                highlightcolor=GOLD,
-                padx=10,
-                pady=10
-            ).pack(anchor="w")
-
-        self.button(
-            frame,
-            "Done",
-            self.save_settings,
-            primary=True
-        ).widget.pack(pady=(18, 0))
-
-        self.popup.bind("<Return>", self.save_settings)
-
-    # Update the number and its button limits
-    def update_settings_count(self):
-        self.settings_number.configure(
-            text=str(self.settings_count)
-        )
-
-        self.minus_button.set_enabled(
-            not self.count_locked
-            and self.settings_count > game.MIN_OBJECTS
-        )
-
-        self.plus_button.set_enabled(
-            not self.count_locked
-            and self.settings_count < game.MAX_OBJECTS
-        )
-
-        self.reset_button.set_enabled(
-            not self.count_locked
-        )
-
-    def change_count(self, amount):
-        if not self.count_locked and self.screen != "game":
-            new_count = self.settings_count + amount
-
-            if game.MIN_OBJECTS <= new_count <= game.MAX_OBJECTS:
-                self.settings_count = new_count
-
-            self.update_settings_count()
-
-    def reset_count(self):
-        if not self.count_locked and self.screen != "game":
-            self.settings_count = game.INITIAL_OBJECTS
-            self.update_settings_count()
-
-    # Save the starting count, never an active game's count
-    def save_settings(self, event=None):
-        if not self.count_locked and self.screen != "game":
-            self.starting_objects = game.initialize_game(
-                self.settings_count
-            )
-            self.update_count_note()
-
-        self.close_popup()
         return "break"

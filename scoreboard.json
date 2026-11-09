@@ -1,0 +1,22 @@
+{
+  "Easy": {
+    "wins": 0,
+    "losses": 0,
+    "best": 0
+  },
+  "Medium": {
+    "wins": 0,
+    "losses": 0,
+    "best": 0
+  },
+  "Hard": {
+    "wins": 0,
+    "losses": 0,
+    "best": 0
+  },
+  "Extreme": {
+    "wins": 0,
+    "losses": 0,
+    "best": 0
+  }
+}
