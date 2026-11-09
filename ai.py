@@ -84,3 +84,86 @@ def minimax_ai(remaining_objects, depth=3):
 
 #extreme level algorithm
 #AI uses alpha-beta pruning algorithm.
+
+def alpha_beta(remaining_objects, depth, alpha, beta, maximizing):
+
+    # Check if the game is over
+    if remaining_objects == 0:
+        return 1 if maximizing else -1
+
+    # Check if depth limit is reached
+    if depth == 0:
+        return evaluate(remaining_objects, maximizing)
+
+    # AI's turn (MAX)
+    if maximizing:
+        best_score = float('-inf')
+
+        for move in range(1, min(3, remaining_objects) + 1):
+            score = alpha_beta(
+                remaining_objects - move,
+                depth - 1,
+                alpha,
+                beta,
+                False
+            )
+
+            best_score = max(best_score, score)
+
+            # Update alpha
+            alpha = max(alpha, best_score)
+
+            # Prune if alpha >= beta
+            if alpha >= beta:
+                break
+
+        return best_score
+
+    # Human's turn (MIN)
+    else:
+        best_score = float('inf')
+
+        for move in range(1, min(3, remaining_objects) + 1):
+            score = alpha_beta(
+                remaining_objects - move,
+                depth - 1,
+                alpha,
+                beta,
+                True
+            )
+
+            best_score = min(best_score, score)
+
+            # Update beta
+            beta = min(beta, best_score)
+
+            # Prune if alpha >= beta
+            if alpha >= beta:
+                break
+
+        return best_score
+
+
+def alpha_beta_ai(remaining_objects, depth=6):
+    best_score = float('-inf')
+    best_move = 1
+
+    alpha = float('-inf')
+    beta = float('inf')
+
+    for move in range(1, min(3, remaining_objects) + 1):
+        score = alpha_beta(
+            remaining_objects - move,
+            depth - 1,
+            alpha,
+            beta,
+            False
+        )
+
+        if score > best_score:
+            best_score = score
+            best_move = move
+
+        alpha = max(alpha, best_score)
+
+    return best_move
