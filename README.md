@@ -219,3 +219,47 @@ TheNimGame/
 | `sounds/` | Contains the game's WAV sound effects. |
 | `README.md` | Explains the project, rules, scoring, interface, algorithms, and file structure. |
 | `.gitignore` | Excludes temporary files such as Python cache folders. |
+
+## How to Run
+
+### 1. Check that Python and Tkinter are installed
+
+Open a terminal (Command Prompt or PowerShell on Windows) and run:
+
+```bash
+python --version
+python -m tkinter
+```
+
+The first command should show Python 3. The second should open a small test window, which confirms that Tkinter works. Close that window afterwards.
+
+On macOS and Linux, use `python3` instead of `python` if `python` is not found.
+
+If Tkinter is missing:
+
+- **Windows / macOS:** Reinstall Python from [python.org](https://www.python.org/downloads/) and keep the Tcl/Tk option selected.
+- **Ubuntu / Debian Linux:** `sudo apt install python3-tk`
+
+### 2. Open the project folder
+
+```bash
+cd TheNimGame
+```
+
+Make sure `main.py`, `UI.py`, and the `sounds` folder are all in this folder.
+
+### 3. Start the game
+
+```bash
+python main.py
+```
+
+The game window opens on the main menu. Select **PLAY** to begin.
+
+### Optional: terminal version
+
+The original text-based version can be run without the graphical interface:
+
+```bash
+python game.py
+```
