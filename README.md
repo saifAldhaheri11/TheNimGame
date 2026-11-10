@@ -6,7 +6,7 @@ This project is an interactive Python implementation of the **Nim Game**.
 
 The game allows a human player to compete against an AI opponent using different decision-making and search algorithms.
 
-The game begins with a single pile containing **15 matchsticks by default**. The player can change the starting number to between **5 and 30** in Settings. Players take turns removing 1, 2, or 3 matches from the pile.
+The game begins with a single pile containing **15 matchsticks by default**. The player can choose between **5 and 30 matches** before starting. Players take turns removing 1, 2, or 3 matches.
 
 This project follows the **Misère Nim** variation, where the player who removes the last match **loses**.
 
@@ -19,21 +19,23 @@ The game features four AI difficulty levels:
 
 The player can select the AI difficulty and choose whether to play first or allow the AI to make the opening move.
 
+The game also includes a points system, move history, sound effects, and saved statistics.
+
 The project's objective is to implement and compare AI algorithms based on their decision-making strategies, effectiveness, and computational performance.
 
 ## Requirements
 
-- Python 3
-- Tkinter
-- A computer with a graphical desktop
+- Python 3 with Tkinter.
+- A computer with a graphical desktop.
+- The provided `.wav` files inside the `sounds` folder.
 
-No additional Python packages or image files are required.
+No additional Python packages are required. On Linux, WAV playback uses `aplay` when available.
 
 ## How to Play
 
-1. Select one of the four difficulty levels.
-2. Choose whether you or the AI starts.
-3. To change the starting number of matches, open **Settings**, use **+** or **−**, and press **Done**.
+1. Select **PLAY** from the main menu.
+2. Choose the difficulty and starting player.
+3. Use **+** or **−** to choose between **5 and 30 starting matches**.
 4. Press **Start Game**.
 5. Click any **1, 2, or 3 matches** to select them. Click again to deselect.
 6. Press **Remove** to confirm your move.
@@ -41,10 +43,40 @@ No additional Python packages or image files are required.
 
 **The player who removes the last match loses.**
 
+### Points System
+
+The player earns points based on move quality, decision speed, the game result, and difficulty.
+
+| Action | Points |
+|---|---:|
+| Best-path move | 100 |
+| Other legal move | 20 |
+| Speed bonus per move | Up to 50 |
+| Winning the game | 500 |
+
+The speed bonus decreases as the player takes longer to move and reaches **0 after 10 seconds**.
+
+A best-path move follows the scoring algorithm's preferred outcome: win in fewer moves when possible, or delay losing when defeat is unavoidable under perfect play.
+
+The final score uses the selected difficulty's multiplier:
+
+| Difficulty | Multiplier |
+|---|---:|
+| Easy | ×1 |
+| Medium | ×1.5 |
+| Hard | ×2 |
+| Extreme | ×3 |
+
+**Final score = (total move points + win bonus) × difficulty multiplier**, rounded to a whole number.
+
+Move points include speed bonuses. A loss receives no win bonus, but points earned during the game still count.
+
+High scores are saved separately for each difficulty.
+
 ## Game Rules
 
 1. The game begins with **15 matches by default** in a single pile.
-2. The starting number can be changed to between **5 and 30** before starting.
+2. The starting number can be changed to between **5 and 30** on the PLAY setup page.
 3. The game is played between a human player and an AI opponent.
 4. Each player can remove **1, 2, or 3 matches** during their turn.
 5. A player cannot remove more matches than are currently available.
@@ -52,21 +84,21 @@ No additional Python packages or image files are required.
 7. The game ends when no matches remain.
 8. Before starting, the human player selects one of the four AI difficulty levels.
 9. The human player can choose whether to make the first move or let the AI start.
-10. If the AI starts first, its opening move is randomly selected from the available valid moves, regardless of difficulty.
-11. After its opening move, the AI follows the algorithm associated with the selected difficulty level.
+10. If the AI starts first, its opening move is random, regardless of difficulty.
+11. After its opening move, the AI follows the selected difficulty's algorithm.
 12. The starting number of matches cannot be changed during an active game.
 
 ## User Interface
 
-The graphical interface allows the player to:
+The main menu contains **PLAY**, **Settings**, **How to Play**, **Stats**, and **Quit**.
 
-- Select the difficulty and starting player.
-- Click matches to select them and confirm their removal.
-- View the current turn and remaining matches.
-- Open **How to Play** and **Settings** from the top bar.
-- Restart the game, return to setup, or play again after the result.
+- **PLAY:** Choose the difficulty, starting player, and match count.
+- **Game screen:** Select matches and view the current turn, remaining matches, live score, and move history.
+- **Settings:** Turn AI animations and sound effects on or off.
+- **How to Play:** View illustrated instructions.
+- **Stats:** View wins, losses, win rates, and high scores for each difficulty, or reset the records.
 
-Selected matches are highlighted in gold. Settings includes the starting-match count, AI animations, and selection sound.
+Selected matches glow gold. The result screen displays the winner, final score, and best-move count. Statistics are saved in `scoreboard.json` between sessions.
 
 ## AI Difficulty Levels and Algorithms
 
@@ -112,17 +144,15 @@ Minimax is an adversarial search algorithm designed for two-player games. It eva
 
 The algorithm constructs a game tree representing possible future states and alternates between maximizing the AI's outcome and minimizing it through the opponent's responses.
 
-Unlike full-depth Minimax, this implementation limits the search to three levels to reduce computational cost.
-
 When the search reaches its depth limit before reaching a terminal state, a heuristic evaluation function estimates the desirability of the resulting position.
 
 **Algorithm Characteristics:**
 
 - Uses adversarial search.
-- Explores possible future moves.
-- Uses a fixed search depth of 3.
+- Explores future states up to depth 3.
 - Considers possible opponent responses.
-- Uses a heuristic function for evaluating nonterminal states.
+- Uses a heuristic for nonterminal states.
+- Reuses previously calculated results through memoization.
 
 ### 4. Extreme: Minimax with Alpha-Beta Pruning
 
@@ -137,19 +167,18 @@ The algorithm maintains two values:
 
 When the algorithm determines that further exploration of a branch cannot affect the final decision, it stops searching that branch.
 
-The current game uses a search depth of **4** for Extreme difficulty. If the depth limit is reached before a terminal state, the heuristic evaluation function estimates the position.
+Unlike the Hard difficulty, Extreme searches to terminal states. Its search depth is set to the number of matches remaining.
 
 **Algorithm Characteristics:**
 
 - Uses adversarial search.
-- Uses a fixed search depth of 4 in the current game.
+- Searches to terminal game states.
 - Eliminates unnecessary branches through pruning.
-- Produces the same minimax result as an equivalent search without pruning.
-- Can reduce the number of explored states compared with Minimax without pruning.
+- Uses move ordering to improve pruning.
+- Stores search results to avoid repeating calculations.
+- Produces the same minimax result as an equivalent full-depth search.
 
 ## Project Structure
-
-The project is organized into the following files:
 
 ```text
 TheNimGame/
@@ -159,65 +188,34 @@ TheNimGame/
 ├── game.py
 ├── player.py
 ├── ai.py
+├── scoring.py
+├── scoreboard.py
+├── scoreboard.json
+├── sound.py
+├── sounds/
+│   ├── click.wav
+│   ├── select.wav
+│   ├── deselect.wav
+│   ├── remove.wav
+│   ├── ai_move.wav
+│   ├── win.wav
+│   └── lose.wav
 ├── README.md
 └── .gitignore
 ```
 
-### main.py
-
-Serves as the entry point of the application.
-
-It is responsible for starting the program and opening the graphical interface.
-
-### UI.py
-
-Contains the graphical user interface, including:
-
-- Difficulty and starting-player selection.
-- Displaying and selecting matchsticks.
-- Displaying the game rules and settings.
-- Showing the current turn, remaining matches, and result.
-- Restarting the game and returning to setup.
-
-### session.py
-
-Connects the graphical interface to the game rules and AI algorithms.
-
-It manages the game state, player turns, remaining matches, AI move selection, and winner.
-
-### game.py
-
-Contains the main game rules, including:
-
-- Initializing the starting number of matches.
-- Checking valid moves.
-- Removing matches.
-- Checking game-ending conditions.
-- Determining the winner according to Misère Nim rules.
-
-It also contains the original terminal menus and game loop.
-
-### player.py
-
-Handles the human player's interactions in the terminal version, including:
-
-- Receiving the player's move.
-- Validating player input.
-- Ensuring that the number of removed matches is valid.
-
-### ai.py
-
-Contains the AI decision-making logic for all four difficulty levels:
-
-- Random Algorithm for Easy difficulty.
-- Greedy Algorithm for Medium difficulty.
-- Depth-Limited Minimax for Hard difficulty.
-- Minimax with Alpha-Beta Pruning for Extreme difficulty.
-
-### README.md
-
-Provides the project overview, requirements, game rules, interface information, explanations of the AI algorithms, and project structure.
-
-### .gitignore
-
-Excludes temporary files such as Python cache folders and bytecode files.
+| File | Purpose |
+|---|---|
+| `main.py` | Starts the graphical application. |
+| `UI.py` | Contains the menus, matchstick board, settings, statistics, and result screens. |
+| `session.py` | Manages game state, turns, AI move selection, and move history. |
+| `game.py` | Contains shared game rules and the original terminal version. |
+| `player.py` | Receives and validates player input in the terminal version. |
+| `ai.py` | Contains the four AI algorithms and supporting search functions. |
+| `scoring.py` | Finds best-path moves and calculates move points, speed bonuses, win bonuses, and difficulty multipliers. |
+| `scoreboard.py` | Loads, updates, saves, and resets statistics. |
+| `scoreboard.json` | Stores wins, losses, and high scores for each difficulty. |
+| `sound.py` | Plays sound effects using the operating system's audio tools. |
+| `sounds/` | Contains the game's WAV sound effects. |
+| `README.md` | Explains the project, rules, scoring, interface, algorithms, and file structure. |
+| `.gitignore` | Excludes temporary files such as Python cache folders. |
