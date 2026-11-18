@@ -221,45 +221,76 @@ TheNimGame/
 | `.gitignore` | Excludes temporary files such as Python cache folders. |
 
 ## How to Run
+### Requirements
 
-### 1. Check that Python and Tkinter are installed
+- Python 3 with Tkinter installed.
+- Windows or macOS with a graphical desktop.
+- All project files, including the `sounds` folder and its `.wav` files.
 
-Open a terminal (Command Prompt or PowerShell on Windows) and run:
+No additional Python packages or `pip install` commands are required.
 
-```bash
-python --version
-python -m tkinter
-```
+### Windows
 
-The first command should show Python 3. The second should open a small test window, which confirms that Tkinter works. Close that window afterwards.
+1. **Install Python 3** if it is not already installed. Download it from [python.org](https://www.python.org/downloads/windows/). During installation, enable **Add Python to PATH** if offered, and keep **Tcl/Tk and IDLE** selected.
+2. **Open PowerShell or Command Prompt** and check Python and Tkinter:
 
-On macOS and Linux, use `python3` instead of `python` if `python` is not found.
+   ```powershell
+   py --version
+   py -m tkinter
+   ```
 
-If Tkinter is missing:
+   The first command should display a Python 3 version. The second should open a small Tkinter test window. Close the test window after checking it. If `py` is unavailable, try `python` in both commands instead.
+3. **Open the project folder** in PowerShell or Command Prompt. For example, if it is in your Downloads folder:
 
-- **Windows / macOS:** Reinstall Python from [python.org](https://www.python.org/downloads/) and keep the Tcl/Tk option selected.
-- **Ubuntu / Debian Linux:** `sudo apt install python3-tk`
+   ```powershell
+   cd "$HOME\Downloads\TheNimGame"
+   ```
 
-### 2. Open the project folder
+   Change the path to wherever you saved or extracted the project. Make sure `main.py`, `UI.py`, and `sounds` are inside this folder.
+4. **Start the graphical game:**
 
-```bash
-cd TheNimGame
-```
+   ```powershell
+   py main.py
+   ```
 
-Make sure `main.py`, `UI.py`, and the `sounds` folder are all in this folder.
+   If you used `python` successfully in step 2 instead, run `python main.py`.
 
-### 3. Start the game
+### macOS
 
-```bash
-python main.py
-```
+1. **Install Python 3** if needed from [python.org](https://www.python.org/downloads/macos/). The official macOS installer includes support for Tkinter.
+2. **Open Terminal** and verify Python and Tkinter:
 
-The game window opens on the main menu. Select **PLAY** to begin.
+   ```bash
+   python3 --version
+   python3 -m tkinter
+   ```
 
-### Optional: terminal version
+   The first command should display a Python 3 version. The second should open a small Tkinter test window. Close it after checking.
+3. **Open the project folder** in Terminal. For example, if it is in Downloads:
 
-The original text-based version can be run without the graphical interface:
+   ```bash
+   cd ~/Downloads/TheNimGame
+   ```
 
-```bash
-python game.py
-```
+   Change the path if you stored the project elsewhere. Confirm that `main.py`, `UI.py`, and `sounds` are in the folder.
+4. **Start the graphical game:**
+
+   ```bash
+   python3 main.py
+   ```
+
+After launching, the game window should open on the main menu. Select **PLAY** to begin.
+
+### Optional: Terminal Version
+
+To run the original text-based version instead of the graphical interface, use the following command from the project folder:
+
+- **Windows:** `py game.py` (or `python game.py` if using `python`)
+- **macOS:** `python3 game.py`
+
+### Troubleshooting
+
+- **Python command not found:** Install Python 3 or reopen your terminal after installation. On Windows, try `python` if `py` is unavailable.
+- **`No module named tkinter` or no Tkinter test window:** Install or reinstall a Python build that includes Tcl/Tk, then rerun the Tkinter test command for your operating system.
+- **`can't open file 'main.py'`:** Run the command from the directory containing `main.py`, not from its parent folder.
+- **Missing sound files:** Keep the supplied `sounds` folder alongside the Python files; do not move its `.wav` files elsewhere.

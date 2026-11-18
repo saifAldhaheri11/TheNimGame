@@ -5,9 +5,9 @@
     "best": 0
   },
   "Medium": {
-    "wins": 0,
-    "losses": 0,
-    "best": 0
+    "wins": 1,
+    "losses": 1,
+    "best": 1140
   },
   "Hard": {
     "wins": 0,
